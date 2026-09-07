@@ -232,11 +232,11 @@ otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 
-# Default template renders only the link. We need the six-digit code as well:
-# a device cannot follow a link pointing at the dev machine's loopback.
-[auth.email.template.magic_link]
-subject = "Your Light Weight sign-in code"
-content_path = "./supabase/templates/magic_link.html"
+# The six-digit-code template lives at supabase/templates/magic_link.html but is
+# NOT wired up here: hosted free-tier projects reject template overrides unless a
+# custom SMTP provider is configured, and that rejection fails the whole
+# `config push`. Re-enable locally by restoring the [auth.email.template.magic_link]
+# block, or on the hosted project once custom SMTP is set up.
 
 # Use a production-ready SMTP server
 # [auth.email.smtp]

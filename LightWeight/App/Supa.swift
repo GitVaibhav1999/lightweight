@@ -11,34 +11,28 @@ import Supabase
 enum Supa {
     static let client = SupabaseClient(supabaseURL: url, supabaseKey: anonKey)
 
-    /// Simulator shares the Mac's loopback; a phone does not, so it needs the LAN
-    /// address. Release talks to the hosted project over https.
+    /// The simulator shares the Mac's loopback, so it uses the local stack. A device
+    /// cannot: Google will only redirect an OAuth callback to https (localhost is the
+    /// one exception), and a plain-http LAN address cannot be registered with Google
+    /// at all. So a device — debug or release — talks to the hosted project.
     static var url: URL {
-        #if DEBUG
-        #if targetEnvironment(simulator)
+        #if DEBUG && targetEnvironment(simulator)
         URL(string: "http://127.0.0.1:54321")!
-        #else
-        URL(string: "http://\(devHost):54321")!
-        #endif
         #else
         URL(string: "https://\(projectRef).supabase.co")!
         #endif
     }
 
+    /// Not a secret: it only names the project. Every table is default-deny under RLS,
+    /// so this key alone reads nothing without a user's JWT.
     static var anonKey: String {
-        #if DEBUG
+        #if DEBUG && targetEnvironment(simulator)
         // Fixed local demo key, identical on every machine and published by Supabase.
         "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0"
         #else
-        Bundle.main.object(forInfoDictionaryKey: "SUPABASE_ANON_KEY") as? String ?? ""
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indiam53aGVmb3RzbGtqeHJ2cmdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg3NzUyODAsImV4cCI6MjEwNDM1MTI4MH0.J1rBJeMXdl0QVAmYiod-QUoagngdbDG0NHkrHjVoxKg"
         #endif
     }
 
     static let projectRef = "wbjnwhefotslkjxrvrgm"
-
-    /// The Mac running `supabase start`. Overridable without a rebuild so a
-    /// changed DHCP lease doesn't mean re-signing the app.
-    static var devHost: String {
-        UserDefaults.standard.string(forKey: "supa.devHost") ?? "192.168.101.84"
-    }
 }
