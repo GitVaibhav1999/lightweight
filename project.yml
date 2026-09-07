@@ -11,7 +11,9 @@ settings:
     MARKETING_VERSION: "0.1"
     CURRENT_PROJECT_VERSION: "1"
     SWIFT_VERSION: "5.0"
-    # Personal Apple Developer team — set via `DEVELOPMENT_TEAM=XXXX xcodegen generate` or in Xcode.
+    # Team T963382R64 belongs to vaibhavsanjaymishra@gmail.com. That Apple ID must be
+    # signed in under Xcode > Settings > Accounts or automatic signing authenticates as
+    # whatever other account is listed and the App ID update is rejected.
     DEVELOPMENT_TEAM: T963382R64
     CODE_SIGN_STYLE: Automatic
 
