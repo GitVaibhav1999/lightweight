@@ -53,6 +53,10 @@ targets:
       path: LightWeight/LightWeight.entitlements
       properties:
         com.apple.security.application-groups: [group.com.vaibhavgautam.lightweight]
+        # Sign in with Apple. "Default" is the primary app; a value of "Default"
+        # rather than a group id means this app is not sharing a credential with
+        # a sibling app or website.
+        com.apple.developer.applesignin: [Default]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.vaibhavgautam.lightweight
