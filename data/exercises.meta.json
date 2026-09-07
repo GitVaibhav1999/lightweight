@@ -1,0 +1,255 @@
+{
+  "source": "https://github.com/hasaneyldrm/exercises-dataset",
+  "upstreamCount": 1324,
+  "count": 1312,
+  "collapsedVariants": 12,
+  "attribution": "Media © Gym visual — https://gymvisual.com/",
+  "targets": [
+    [
+      "abs",
+      167
+    ],
+    [
+      "pectorals",
+      156
+    ],
+    [
+      "biceps",
+      150
+    ],
+    [
+      "delts",
+      142
+    ],
+    [
+      "glutes",
+      141
+    ],
+    [
+      "triceps",
+      141
+    ],
+    [
+      "upper back",
+      88
+    ],
+    [
+      "lats",
+      81
+    ],
+    [
+      "calves",
+      57
+    ],
+    [
+      "quads",
+      44
+    ],
+    [
+      "forearms",
+      37
+    ],
+    [
+      "cardiovascular system",
+      29
+    ],
+    [
+      "hamstrings",
+      27
+    ],
+    [
+      "spine",
+      19
+    ],
+    [
+      "traps",
+      15
+    ],
+    [
+      "adductors",
+      6
+    ],
+    [
+      "serratus anterior",
+      5
+    ],
+    [
+      "abductors",
+      5
+    ],
+    [
+      "levator scapulae",
+      2
+    ]
+  ],
+  "bodyParts": [
+    [
+      "upper arms",
+      291
+    ],
+    [
+      "upper legs",
+      223
+    ],
+    [
+      "back",
+      203
+    ],
+    [
+      "waist",
+      167
+    ],
+    [
+      "chest",
+      161
+    ],
+    [
+      "shoulders",
+      142
+    ],
+    [
+      "lower legs",
+      57
+    ],
+    [
+      "lower arms",
+      37
+    ],
+    [
+      "cardio",
+      29
+    ],
+    [
+      "neck",
+      2
+    ]
+  ],
+  "equipment": [
+    [
+      "body weight",
+      323
+    ],
+    [
+      "dumbbell",
+      293
+    ],
+    [
+      "cable",
+      157
+    ],
+    [
+      "barbell",
+      150
+    ],
+    [
+      "leverage machine",
+      80
+    ],
+    [
+      "band",
+      54
+    ],
+    [
+      "smith machine",
+      47
+    ],
+    [
+      "kettlebell",
+      41
+    ],
+    [
+      "weighted",
+      36
+    ],
+    [
+      "stability ball",
+      27
+    ],
+    [
+      "ez barbell",
+      22
+    ],
+    [
+      "assisted",
+      15
+    ],
+    [
+      "sled machine",
+      14
+    ],
+    [
+      "medicine ball",
+      13
+    ],
+    [
+      "rope",
+      10
+    ],
+    [
+      "roller",
+      8
+    ],
+    [
+      "resistance band",
+      7
+    ],
+    [
+      "bosu ball",
+      3
+    ],
+    [
+      "olympic barbell",
+      2
+    ],
+    [
+      "wheel roller",
+      2
+    ],
+    [
+      "upper body ergometer",
+      1
+    ],
+    [
+      "skierg machine",
+      1
+    ],
+    [
+      "hammer",
+      1
+    ],
+    [
+      "stationary bike",
+      1
+    ],
+    [
+      "tire",
+      1
+    ],
+    [
+      "trap bar",
+      1
+    ],
+    [
+      "elliptical machine",
+      1
+    ],
+    [
+      "stepmill machine",
+      1
+    ]
+  ],
+  "loadTypes": [
+    [
+      "weight+reps",
+      966
+    ],
+    [
+      "bodyweight+reps",
+      317
+    ],
+    [
+      "time",
+      29
+    ]
+  ]
+}

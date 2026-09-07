@@ -1,0 +1,38 @@
+# ── secrets ───────────────────────────────────────────────────────────────
+# Real OpenRouter key. Never commit. See Config/Secrets.example.xcconfig.
+Config/Secrets.xcconfig
+supabase/.env
+supabase/functions/.env
+.env
+.env.local
+
+# ── build output ──────────────────────────────────────────────────────────
+build/
+DerivedData/
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/
+.swiftpm/
+
+# XcodeGen regenerates this from project.yml — keeping it invites merge pain
+LightWeight.xcodeproj/
+
+# ── e2e ───────────────────────────────────────────────────────────────────
+e2e/node_modules/
+e2e/appium.log
+e2e/shots/
+e2e/*.log
+
+# ── supabase local runtime ────────────────────────────────────────────────
+supabase/.branches/
+supabase/.temp/
+
+# ── macOS ─────────────────────────────────────────────────────────────────
+.DS_Store
+*.swp
+
+# ── regenerable caches ────────────────────────────────────────────────────
+# 17MB upstream dataset dump; scripts/build_exercises.py refetches it
+.cache/
+__pycache__/
+*.pyc

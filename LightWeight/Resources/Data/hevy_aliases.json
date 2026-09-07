@@ -1,0 +1,1005 @@
+{
+  "Behind the Back Curl (Cable)": {
+    "id": "0868",
+    "name": "cable curl",
+    "confidence": 0.5,
+    "candidates": [
+      {
+        "id": "0868",
+        "name": "cable curl",
+        "score": 0.5
+      },
+      {
+        "id": "0224",
+        "name": "cable standing back wrist curl",
+        "score": 0.42
+      },
+      {
+        "id": "1630",
+        "name": "cable close grip curl",
+        "score": 0.36
+      }
+    ],
+    "review": true
+  },
+  "Bench Press (Barbell)": {
+    "id": "0025",
+    "name": "barbell bench press",
+    "confidence": 1.15,
+    "candidates": [
+      {
+        "id": "0025",
+        "name": "barbell bench press",
+        "score": 1.15
+      },
+      {
+        "id": "0030",
+        "name": "barbell close-grip bench press",
+        "score": 0.86
+      },
+      {
+        "id": "0033",
+        "name": "barbell decline bench press",
+        "score": 0.86
+      }
+    ],
+    "review": false
+  },
+  "Bench Press (Dumbbell)": {
+    "id": "0289",
+    "name": "dumbbell bench press",
+    "confidence": 1.15,
+    "candidates": [
+      {
+        "id": "0289",
+        "name": "dumbbell bench press",
+        "score": 1.15
+      },
+      {
+        "id": "0290",
+        "name": "dumbbell bench seated press",
+        "score": 0.86
+      },
+      {
+        "id": "0301",
+        "name": "dumbbell decline bench press",
+        "score": 0.86
+      }
+    ],
+    "review": false
+  },
+  "Bench Press (Smith Machine)": {
+    "id": "0748",
+    "name": "smith bench press",
+    "confidence": 0.9,
+    "candidates": [
+      {
+        "id": "0748",
+        "name": "smith bench press",
+        "score": 0.9
+      },
+      {
+        "id": "0751",
+        "name": "smith close-grip bench press",
+        "score": 0.71
+      },
+      {
+        "id": "0753",
+        "name": "smith decline bench press",
+        "score": 0.71
+      }
+    ],
+    "review": false
+  },
+  "Bent Over Row (Barbell)": {
+    "id": "0027",
+    "name": "barbell bent over row",
+    "confidence": 1.15,
+    "candidates": [
+      {
+        "id": "0027",
+        "name": "barbell bent over row",
+        "score": 1.15
+      },
+      {
+        "id": "0118",
+        "name": "barbell reverse grip bent over row",
+        "score": 0.91
+      },
+      {
+        "id": "0574",
+        "name": "lever bent over row",
+        "score": 0.91
+      }
+    ],
+    "review": false
+  },
+  "Bicep Curl (Barbell)": {
+    "id": "0031",
+    "name": "barbell curl",
+    "confidence": 1.0,
+    "candidates": [],
+    "review": false,
+    "curated": true
+  },
+  "Bicep Curl (Cable)": {
+    "id": "1634",
+    "name": "cable lying bicep curl",
+    "confidence": 0.86,
+    "candidates": [
+      {
+        "id": "1634",
+        "name": "cable lying bicep curl",
+        "score": 0.86
+      },
+      {
+        "id": "1638",
+        "name": "cable pulldown bicep curl",
+        "score": 0.86
+      },
+      {
+        "id": "0868",
+        "name": "cable curl",
+        "score": 0.667
+      }
+    ],
+    "review": false
+  },
+  "Butterfly (Pec Deck)": {
+    "id": "0596",
+    "name": "lever seated fly",
+    "confidence": 1.0,
+    "candidates": [],
+    "review": false,
+    "curated": true
+  },
+  "Cable Fly Crossovers": {
+    "id": null,
+    "name": null,
+    "confidence": 1.0,
+    "candidates": [],
+    "review": false,
+    "curated": true
+  },
+  "Calf Press (Machine)": {
+    "id": "2289",
+    "name": "lever calf press",
+    "confidence": 0.75,
+    "candidates": [
+      {
+        "id": "2289",
+        "name": "lever calf press",
+        "score": 0.75
+      },
+      {
+        "id": "2335",
+        "name": "lever seated calf press",
+        "score": 0.61
+      },
+      {
+        "id": "0577",
+        "name": "lever chest press",
+        "score": 0.293
+      }
+    ],
+    "review": false
+  },
+  "Chest Press (Machine)": {
+    "id": "0577",
+    "name": "lever chest press",
+    "confidence": 0.75,
+    "candidates": [
+      {
+        "id": "0577",
+        "name": "lever chest press",
+        "score": 0.75
+      },
+      {
+        "id": "1300",
+        "name": "lever decline chest press",
+        "score": 0.61
+      },
+      {
+        "id": "1299",
+        "name": "lever incline chest press",
+        "score": 0.61
+      }
+    ],
+    "review": false
+  },
+  "Concentration Curl": {
+    "id": "0976",
+    "name": "band concentration curl",
+    "confidence": 0.777,
+    "candidates": [
+      {
+        "id": "0976",
+        "name": "band concentration curl",
+        "score": 0.777
+      },
+      {
+        "id": "1631",
+        "name": "cable concentration curl",
+        "score": 0.777
+      },
+      {
+        "id": "0297",
+        "name": "dumbbell concentration curl",
+        "score": 0.777
+      }
+    ],
+    "review": false
+  },
+  "Dumbbell Row": {
+    "id": "0327",
+    "name": "dumbbell incline row",
+    "confidence": 0.777,
+    "candidates": [
+      {
+        "id": "0327",
+        "name": "dumbbell incline row",
+        "score": 0.777
+      },
+      {
+        "id": "2327",
+        "name": "dumbbell reverse grip row",
+        "score": 0.777
+      },
+      {
+        "id": "0437",
+        "name": "dumbbell upright row",
+        "score": 0.777
+      }
+    ],
+    "review": false
+  },
+  "Face Pull": {
+    "id": null,
+    "name": null,
+    "confidence": 1.0,
+    "candidates": [],
+    "review": false,
+    "curated": true
+  },
+  "Front Raise (Dumbbell)": {
+    "id": "0310",
+    "name": "dumbbell front raise",
+    "confidence": 1.15,
+    "candidates": [
+      {
+        "id": "0310",
+        "name": "dumbbell front raise",
+        "score": 1.15
+      },
+      {
+        "id": "0392",
+        "name": "dumbbell seated front raise",
+        "score": 0.86
+      },
+      {
+        "id": "0309",
+        "name": "dumbbell front raise v. 2",
+        "score": 0.67
+      }
+    ],
+    "review": false
+  },
+  "Hack Squat (Machine)": {
+    "id": "0743",
+    "name": "sled hack squat",
+    "confidence": 1.0,
+    "candidates": [],
+    "review": false,
+    "curated": true
+  },
+  "Hammer Curl (Cable)": {
+    "id": "0165",
+    "name": "cable hammer curl (with rope)",
+    "confidence": 0.86,
+    "candidates": [
+      {
+        "id": "0165",
+        "name": "cable hammer curl (with rope)",
+        "score": 0.86
+      },
+      {
+        "id": "1639",
+        "name": "cable rope hammer preacher curl",
+        "score": 0.67
+      },
+      {
+        "id": "0868",
+        "name": "cable curl",
+        "score": 0.667
+      }
+    ],
+    "review": false
+  },
+  "Hanging Knee Raise": {
+    "id": "0011",
+    "name": "assisted hanging knee raise",
+    "confidence": 0.86,
+    "candidates": [
+      {
+        "id": "0011",
+        "name": "assisted hanging knee raise",
+        "score": 0.86
+      },
+      {
+        "id": "1761",
+        "name": "hanging oblique knee raise",
+        "score": 0.61
+      },
+      {
+        "id": "0010",
+        "name": "assisted hanging knee raise with throw down",
+        "score": 0.53
+      }
+    ],
+    "review": false
+  },
+  "Incline Bench Press (Barbell)": {
+    "id": "0047",
+    "name": "barbell incline bench press",
+    "confidence": 1.15,
+    "candidates": [
+      {
+        "id": "0047",
+        "name": "barbell incline bench press",
+        "score": 1.15
+      },
+      {
+        "id": "1719",
+        "name": "barbell incline close grip bench press",
+        "score": 0.91
+      },
+      {
+        "id": "1257",
+        "name": "barbell reverse grip incline bench press",
+        "score": 0.91
+      }
+    ],
+    "review": false
+  },
+  "Incline Bench Press (Dumbbell)": {
+    "id": "0314",
+    "name": "dumbbell incline bench press",
+    "confidence": 1.15,
+    "candidates": [
+      {
+        "id": "0314",
+        "name": "dumbbell incline bench press",
+        "score": 1.15
+      },
+      {
+        "id": "0289",
+        "name": "dumbbell bench press",
+        "score": 0.75
+      },
+      {
+        "id": "1623",
+        "name": "dumbbell palms in incline bench press",
+        "score": 0.737
+      }
+    ],
+    "review": false
+  },
+  "Incline Bench Press (Smith Machine)": {
+    "id": "0757",
+    "name": "smith incline bench press",
+    "confidence": 0.95,
+    "candidates": [
+      {
+        "id": "0757",
+        "name": "smith incline bench press",
+        "score": 0.95
+      },
+      {
+        "id": "0748",
+        "name": "smith bench press",
+        "score": 0.6
+      },
+      {
+        "id": "0047",
+        "name": "barbell incline bench press",
+        "score": 0.56
+      }
+    ],
+    "review": false
+  },
+  "Iso-Lateral Row (Machine)": {
+    "id": null,
+    "name": null,
+    "confidence": 1.0,
+    "candidates": [],
+    "review": false,
+    "curated": true
+  },
+  "Lat Pulldown (Cable)": {
+    "id": "0198",
+    "name": "cable pulldown",
+    "confidence": 1.0,
+    "candidates": [],
+    "review": false,
+    "curated": true
+  },
+  "Lateral Raise (Dumbbell)": {
+    "id": "0334",
+    "name": "dumbbell lateral raise",
+    "confidence": 1.15,
+    "candidates": [
+      {
+        "id": "0334",
+        "name": "dumbbell lateral raise",
+        "score": 1.15
+      },
+      {
+        "id": "0380",
+        "name": "dumbbell rear lateral raise",
+        "score": 0.86
+      },
+      {
+        "id": "0396",
+        "name": "dumbbell seated lateral raise",
+        "score": 0.86
+      }
+    ],
+    "review": false
+  },
+  "Leg Extension (Machine)": {
+    "id": "0585",
+    "name": "lever leg extension",
+    "confidence": 0.75,
+    "candidates": [
+      {
+        "id": "0585",
+        "name": "lever leg extension",
+        "score": 0.75
+      },
+      {
+        "id": "3007",
+        "name": "resistance band leg extension",
+        "score": 0.32
+      },
+      {
+        "id": "0573",
+        "name": "lever back extension",
+        "score": 0.293
+      }
+    ],
+    "review": false
+  },
+  "Leg Press (Machine)": {
+    "id": "1463",
+    "name": "sled 45° leg press",
+    "confidence": 1.0,
+    "candidates": [],
+    "review": false,
+    "curated": true
+  },
+  "Lying Leg Curl (Machine)": {
+    "id": "0586",
+    "name": "lever lying leg curl",
+    "confidence": 0.817,
+    "candidates": [
+      {
+        "id": "0586",
+        "name": "lever lying leg curl",
+        "score": 0.817
+      },
+      {
+        "id": "3195",
+        "name": "lever lying two-one leg curl",
+        "score": 0.681
+      },
+      {
+        "id": "0582",
+        "name": "lever kneeling leg curl",
+        "score": 0.389
+      }
+    ],
+    "review": false
+  },
+  "Overhead Press (Barbell)": {
+    "id": "0091",
+    "name": "barbell seated overhead press",
+    "confidence": 0.86,
+    "candidates": [
+      {
+        "id": "0091",
+        "name": "barbell seated overhead press",
+        "score": 0.86
+      },
+      {
+        "id": "0025",
+        "name": "barbell bench press",
+        "score": 0.46
+      },
+      {
+        "id": "0028",
+        "name": "barbell clean and press",
+        "score": 0.46
+      }
+    ],
+    "review": false
+  },
+  "Overhead Press (Smith Machine)": {
+    "id": "0766",
+    "name": "smith shoulder press",
+    "confidence": 1.0,
+    "candidates": [],
+    "review": false,
+    "curated": true
+  },
+  "Overhead Triceps Extension (Cable)": {
+    "id": "1722",
+    "name": "cable high pulley overhead tricep extension",
+    "confidence": 0.737,
+    "candidates": [
+      {
+        "id": "1722",
+        "name": "cable high pulley overhead tricep extension",
+        "score": 0.737
+      },
+      {
+        "id": "0194",
+        "name": "cable overhead triceps extension (rope attachment)",
+        "score": 0.737
+      },
+      {
+        "id": "1724",
+        "name": "cable rope high pulley overhead tricep extension",
+        "score": 0.601
+      }
+    ],
+    "review": true
+  },
+  "Pull Up": {
+    "id": "0652",
+    "name": "pull-up",
+    "confidence": 1.0,
+    "candidates": [],
+    "review": false,
+    "curated": true
+  },
+  "Rear Delt Reverse Fly (Machine)": {
+    "id": null,
+    "name": null,
+    "confidence": 1.0,
+    "candidates": [],
+    "review": false,
+    "curated": true
+  },
+  "Reverse Fly Single Arm (Cable)": {
+    "id": null,
+    "name": null,
+    "confidence": 0.46,
+    "candidates": [
+      {
+        "id": "0240",
+        "name": "cable supine reverse fly",
+        "score": 0.46
+      },
+      {
+        "id": "1413",
+        "name": "cable reverse one arm curl",
+        "score": 0.349
+      },
+      {
+        "id": "0993",
+        "name": "band reverse fly",
+        "score": 0.293
+      }
+    ],
+    "review": true
+  },
+  "Romanian Deadlift (Dumbbell)": {
+    "id": "1459",
+    "name": "dumbbell romanian deadlift",
+    "confidence": 1.0,
+    "candidates": [],
+    "review": false,
+    "curated": true
+  },
+  "Seated Cable Row - Bar Grip": {
+    "id": "0861",
+    "name": "cable seated row",
+    "confidence": 0.75,
+    "candidates": [
+      {
+        "id": "0861",
+        "name": "cable seated row",
+        "score": 0.75
+      },
+      {
+        "id": "0180",
+        "name": "cable low seated row",
+        "score": 0.56
+      },
+      {
+        "id": "1323",
+        "name": "cable rope seated row",
+        "score": 0.56
+      }
+    ],
+    "review": false
+  },
+  "Seated Cable Row - V Grip (Cable)": {
+    "id": "0861",
+    "name": "cable seated row",
+    "confidence": 0.75,
+    "candidates": [
+      {
+        "id": "0861",
+        "name": "cable seated row",
+        "score": 0.75
+      },
+      {
+        "id": "0180",
+        "name": "cable low seated row",
+        "score": 0.56
+      },
+      {
+        "id": "1323",
+        "name": "cable rope seated row",
+        "score": 0.56
+      }
+    ],
+    "review": false
+  },
+  "Seated Calf Raise": {
+    "id": "0088",
+    "name": "barbell seated calf raise",
+    "confidence": 0.86,
+    "candidates": [
+      {
+        "id": "0088",
+        "name": "barbell seated calf raise",
+        "score": 0.86
+      },
+      {
+        "id": "1379",
+        "name": "dumbbell seated calf raise",
+        "score": 0.86
+      },
+      {
+        "id": "0594",
+        "name": "lever seated calf raise",
+        "score": 0.61
+      }
+    ],
+    "review": false
+  },
+  "Seated Lateral Raise (Dumbbell)": {
+    "id": "0396",
+    "name": "dumbbell seated lateral raise",
+    "confidence": 1.15,
+    "candidates": [
+      {
+        "id": "0396",
+        "name": "dumbbell seated lateral raise",
+        "score": 1.15
+      },
+      {
+        "id": "0334",
+        "name": "dumbbell lateral raise",
+        "score": 0.75
+      },
+      {
+        "id": "2317",
+        "name": "dumbbell seated bent arm lateral raise",
+        "score": 0.737
+      }
+    ],
+    "review": false
+  },
+  "Seated Leg Curl (Machine)": {
+    "id": "0599",
+    "name": "lever seated leg curl",
+    "confidence": 0.817,
+    "candidates": [
+      {
+        "id": "0599",
+        "name": "lever seated leg curl",
+        "score": 0.817
+      },
+      {
+        "id": "0582",
+        "name": "lever kneeling leg curl",
+        "score": 0.389
+      },
+      {
+        "id": "0586",
+        "name": "lever lying leg curl",
+        "score": 0.389
+      }
+    ],
+    "review": false
+  },
+  "Seated Overhead Press (Barbell)": {
+    "id": "0091",
+    "name": "barbell seated overhead press",
+    "confidence": 1.15,
+    "candidates": [
+      {
+        "id": "0091",
+        "name": "barbell seated overhead press",
+        "score": 1.15
+      },
+      {
+        "id": "0087",
+        "name": "barbell seated bradford rocky press",
+        "score": 0.42
+      },
+      {
+        "id": "0092",
+        "name": "barbell seated overhead triceps extension",
+        "score": 0.42
+      }
+    ],
+    "review": false
+  },
+  "Seated Row (Machine)": {
+    "id": "1350",
+    "name": "lever seated row",
+    "confidence": 0.75,
+    "candidates": [
+      {
+        "id": "1350",
+        "name": "lever seated row",
+        "score": 0.75
+      },
+      {
+        "id": "0588",
+        "name": "lever narrow grip seated row",
+        "score": 0.61
+      },
+      {
+        "id": "0571",
+        "name": "lever alternating narrow grip seated row",
+        "score": 0.499
+      }
+    ],
+    "review": false
+  },
+  "Seated Shoulder Press (Machine)": {
+    "id": "0405",
+    "name": "dumbbell seated shoulder press",
+    "confidence": 0.56,
+    "candidates": [
+      {
+        "id": "0405",
+        "name": "dumbbell seated shoulder press",
+        "score": 0.56
+      },
+      {
+        "id": "0603",
+        "name": "lever shoulder press",
+        "score": 0.5
+      },
+      {
+        "id": "0765",
+        "name": "smith seated shoulder press",
+        "score": 0.46
+      }
+    ],
+    "review": true
+  },
+  "Shrug (Dumbbell)": {
+    "id": "0406",
+    "name": "dumbbell shrug",
+    "confidence": 1.15,
+    "candidates": [
+      {
+        "id": "0406",
+        "name": "dumbbell shrug",
+        "score": 1.15
+      },
+      {
+        "id": "0305",
+        "name": "dumbbell decline shrug",
+        "score": 0.777
+      },
+      {
+        "id": "0329",
+        "name": "dumbbell incline shrug",
+        "score": 0.777
+      }
+    ],
+    "review": false
+  },
+  "Single Arm Cable Row": {
+    "id": null,
+    "name": null,
+    "confidence": 1.0,
+    "candidates": [],
+    "review": false,
+    "curated": true
+  },
+  "Single Arm Lateral Raise (Cable)": {
+    "id": "0192",
+    "name": "cable one arm lateral raise",
+    "confidence": 0.627,
+    "candidates": [
+      {
+        "id": "0192",
+        "name": "cable one arm lateral raise",
+        "score": 0.627
+      },
+      {
+        "id": "0178",
+        "name": "cable lateral raise",
+        "score": 0.6
+      },
+      {
+        "id": "0191",
+        "name": "cable one arm lateral bent-over",
+        "score": 0.349
+      }
+    ],
+    "review": true
+  },
+  "Single Leg Standing Calf Raise (Machine)": {
+    "id": null,
+    "name": null,
+    "confidence": 1.0,
+    "candidates": [],
+    "review": false,
+    "curated": true
+  },
+  "Squat (Barbell)": {
+    "id": "0043",
+    "name": "barbell full squat",
+    "confidence": 1.0,
+    "candidates": [],
+    "review": false,
+    "curated": true
+  },
+  "Standing Calf Raise (Smith)": {
+    "id": "0773",
+    "name": "smith standing leg calf raise",
+    "confidence": 0.777,
+    "candidates": [
+      {
+        "id": "0773",
+        "name": "smith standing leg calf raise",
+        "score": 0.777
+      },
+      {
+        "id": "1372",
+        "name": "barbell standing calf raise",
+        "score": 0.56
+      },
+      {
+        "id": "1375",
+        "name": "cable standing calf raise",
+        "score": 0.56
+      }
+    ],
+    "review": false
+  },
+  "Standing Leg Curls": {
+    "id": "0795",
+    "name": "standing single leg curl",
+    "confidence": 0.61,
+    "candidates": [
+      {
+        "id": "0795",
+        "name": "standing single leg curl",
+        "score": 0.61
+      },
+      {
+        "id": "0853",
+        "name": "weighted standing curl",
+        "score": 0.46
+      },
+      {
+        "id": "0106",
+        "name": "barbell standing close grip curl",
+        "score": 0.32
+      }
+    ],
+    "review": true
+  },
+  "Straight Arm Lat Pulldown (Cable)": {
+    "id": "0238",
+    "name": "cable straight arm pulldown",
+    "confidence": 0.8,
+    "candidates": [
+      {
+        "id": "0238",
+        "name": "cable straight arm pulldown",
+        "score": 0.8
+      },
+      {
+        "id": "0237",
+        "name": "cable straight arm pulldown (with rope)",
+        "score": 0.627
+      },
+      {
+        "id": "3563",
+        "name": "cable one arm pulldown",
+        "score": 0.46
+      }
+    ],
+    "review": false
+  },
+  "Straight Leg Deadlift": {
+    "id": "0116",
+    "name": "barbell straight leg deadlift",
+    "confidence": 1.0,
+    "candidates": [],
+    "review": false,
+    "curated": true
+  },
+  "T Bar Row": {
+    "id": "0606",
+    "name": "lever t bar row",
+    "confidence": 1.0,
+    "candidates": [],
+    "review": false,
+    "curated": true
+  },
+  "Triceps Extension (Cable)": {
+    "id": "0149",
+    "name": "cable alternate triceps extension",
+    "confidence": 0.86,
+    "candidates": [
+      {
+        "id": "0149",
+        "name": "cable alternate triceps extension",
+        "score": 0.86
+      },
+      {
+        "id": "0173",
+        "name": "cable incline triceps extension",
+        "score": 0.86
+      },
+      {
+        "id": "0176",
+        "name": "cable kneeling triceps extension",
+        "score": 0.86
+      }
+    ],
+    "review": false
+  },
+  "Triceps Extension (Dumbbell)": {
+    "id": "0306",
+    "name": "dumbbell decline triceps extension",
+    "confidence": 0.86,
+    "candidates": [
+      {
+        "id": "0306",
+        "name": "dumbbell decline triceps extension",
+        "score": 0.86
+      },
+      {
+        "id": "0330",
+        "name": "dumbbell incline triceps extension",
+        "score": 0.86
+      },
+      {
+        "id": "0351",
+        "name": "dumbbell lying triceps extension",
+        "score": 0.86
+      }
+    ],
+    "review": false
+  },
+  "Triceps Pushdown": {
+    "id": "0201",
+    "name": "cable pushdown",
+    "confidence": 1.0,
+    "candidates": [],
+    "review": false,
+    "curated": true
+  },
+  "Triceps Rope Pushdown": {
+    "id": "0200",
+    "name": "cable pushdown (with rope attachment)",
+    "confidence": 1.0,
+    "candidates": [],
+    "review": false,
+    "curated": true
+  }
+}

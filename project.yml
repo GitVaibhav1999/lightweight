@@ -1,0 +1,110 @@
+name: LightWeight
+options:
+  bundleIdPrefix: com.vaibhavgautam
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+
+settings:
+  base:
+    MARKETING_VERSION: "0.1"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_VERSION: "5.0"
+    # Personal Apple Developer team — set via `DEVELOPMENT_TEAM=XXXX xcodegen generate` or in Xcode.
+    DEVELOPMENT_TEAM: T963382R64
+    CODE_SIGN_STYLE: Automatic
+
+targets:
+  LightWeight:
+    type: application
+    platform: iOS
+    deploymentTarget: "26.0"
+    configFiles:
+      Debug: Config/Secrets.xcconfig
+      Release: Config/Secrets.xcconfig
+    sources:
+      - path: LightWeight
+      - path: Thumbs
+        type: folder
+        buildPhase: resources
+    dependencies:
+      - target: LightWeightWidgets
+        embed: true
+    info:
+      path: LightWeight/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: Light Weight
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        NSSupportsLiveActivities: true
+        UIAppFonts:
+          - "Archivo[wdth,wght].ttf"
+          - IBMPlexMono-Regular.ttf
+          - IBMPlexMono-SemiBold.ttf
+        ITSAppUsesNonExemptEncryption: false
+        UIFileSharingEnabled: true
+        COACH_API_KEY: "$(COACH_API_KEY)"
+        LSSupportsOpeningDocumentsInPlace: true
+        CFBundleURLTypes:
+          - CFBundleURLSchemes: [lightweight]
+    entitlements:
+      path: LightWeight/LightWeight.entitlements
+      properties:
+        com.apple.security.application-groups: [group.com.vaibhavgautam.lightweight]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.vaibhavgautam.lightweight
+        TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+  LightWeightWidgets:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "26.0"
+    entitlements:
+      path: LightWeightWidgets/LightWeightWidgets.entitlements
+      properties:
+        com.apple.security.application-groups: [group.com.vaibhavgautam.lightweight]
+    sources:
+      - path: LightWeightWidgets
+      - path: LightWeight/Model/WorkoutActivity.swift
+      - path: LightWeight/Model/MarkSetIntent.swift
+      - path: LightWeight/Model/WidgetSnapshot.swift
+      - path: LightWeight/Resources/Fonts/Archivo[wdth,wght].ttf
+        buildPhase: resources
+      - path: LightWeight/Resources/Fonts/IBMPlexMono-Regular.ttf
+        buildPhase: resources
+      - path: LightWeight/Resources/Fonts/IBMPlexMono-SemiBold.ttf
+        buildPhase: resources
+    info:
+      path: LightWeightWidgets/Info.plist
+      properties:
+        CFBundleDisplayName: Light Weight
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+        UIAppFonts:
+          - "Archivo[wdth,wght].ttf"
+          - IBMPlexMono-Regular.ttf
+          - IBMPlexMono-SemiBold.ttf
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.vaibhavgautam.lightweight.widgets
+        TARGETED_DEVICE_FAMILY: "1"
+        SKIP_INSTALL: YES
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) LW_WIDGET"
+
+  LightWeightTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: Tests
+    dependencies:
+      - target: LightWeight
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.vaibhavgautam.lightweight.tests
+        GENERATE_INFOPLIST_FILE: YES
