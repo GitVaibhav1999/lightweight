@@ -6,6 +6,11 @@ options:
   createIntermediateGroups: true
   generateEmptyDirectories: true
 
+packages:
+  Supabase:
+    url: https://github.com/supabase/supabase-swift
+    from: 2.5.1
+
 settings:
   base:
     MARKETING_VERSION: "0.1"
@@ -33,6 +38,8 @@ targets:
     dependencies:
       - target: LightWeightWidgets
         embed: true
+      - package: Supabase
+        product: Supabase
     info:
       path: LightWeight/Resources/Info.plist
       properties:
@@ -46,6 +53,12 @@ targets:
           - IBMPlexMono-Regular.ttf
           - IBMPlexMono-SemiBold.ttf
         ITSAppUsesNonExemptEncryption: false
+        # Debug builds talk to Supabase on the Mac over plain http on the LAN.
+        # NSAllowsLocalNetworking permits that for private-range IPs only, rather
+        # than disabling ATS globally. Release points at https and never uses it.
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        NSLocalNetworkUsageDescription: Connects to the Supabase development server running on your Mac.
         UIFileSharingEnabled: true
         COACH_API_KEY: "$(COACH_API_KEY)"
         LSSupportsOpeningDocumentsInPlace: true

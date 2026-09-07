@@ -8,12 +8,12 @@ for (const f of fs.readdirSync(OUT)) if (/^\d\d-/.test(f)) fs.unlinkSync(OUT + f
 
 const driver = await remote({ hostname: '127.0.0.1', port: 4723, path: '/', logLevel: 'error', capabilities: {
   platformName: 'iOS', 'appium:automationName': 'XCUITest', 'appium:udid': UDID, 'appium:bundleId': 'com.vaibhavgautam.lightweight',
-  'appium:noReset': true, 'appium:processArguments': { args: ['--today', '2026-08-27', '--coach-fixture', '--coach-demo', '--coach-fail-once'] }, 'appium:newCommandTimeout': 300,
+  'appium:noReset': true, 'appium:processArguments': { args: ['--today', '2026-08-27', '--coach-fixture', '--coach-demo', '--coach-fail-once', '--mock-auth'] }, 'appium:newCommandTimeout': 300,
   'appium:wdaLaunchTimeout': 300000, 'appium:waitForQuiescence': false } });
 
 // always start from a FRESH app process — and relaunch WITH the debug arguments:
 // activateApp drops processArguments (lost --today AND --coach-fixture → live API calls + real dates!)
-const LAUNCH_ARGS = ['--today', '2026-08-27', '--coach-fixture', '--coach-demo', '--coach-fail-once'];
+const LAUNCH_ARGS = ['--today', '2026-08-27', '--coach-fixture', '--coach-demo', '--coach-fail-once', '--mock-auth'];
 await driver.execute('mobile: terminateApp', { bundleId: 'com.vaibhavgautam.lightweight' }).catch(() => {});
 await new Promise(r => setTimeout(r, 800));
 await driver.execute('mobile: launchApp', { bundleId: 'com.vaibhavgautam.lightweight', arguments: LAUNCH_ARGS });

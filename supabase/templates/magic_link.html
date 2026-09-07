@@ -1,0 +1,11 @@
+<!-- GoTrue renders {{ .Token }} (the six-digit code) and {{ .ConfirmationURL }} from
+     the same request. The default template only shows the link; on a phone that link
+     points at the dev machine's loopback and cannot resolve, so the code leads. -->
+<h2>Your sign-in code</h2>
+
+<p style="font-family:monospace;font-size:28px;letter-spacing:6px;margin:16px 0">{{ .Token }}</p>
+
+<p>Enter this code in Light Weight to sign in. It expires in an hour and can only be used once.</p>
+
+<p style="color:#888;font-size:12px">If you opened this on the same device, you can also
+<a href="{{ .ConfirmationURL }}">sign in directly</a>.</p>
