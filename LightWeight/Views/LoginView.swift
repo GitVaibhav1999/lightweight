@@ -8,6 +8,9 @@ struct LoginView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var shown = false
     @State private var breathing = false
+    @State private var pending: Provider?        // which row is spinning; both disable together
+
+    private enum Provider { case apple, google }
 
     private let ground = SplashBloom.ground
     private let ink = Color(lwHex(0xE7E5D7))
@@ -51,9 +54,9 @@ struct LoginView: View {
 
     private var bottom: some View {
         VStack(spacing: 10) {
-            // future providers stack here as 44pt outlined rows; Apple stays the filled primary below them
+            google
             apple
-            Text(auth.offline ? "No connection. Try again." : "Only your Apple ID. No email, no password.")
+            Text(auth.offline ? "No connection. Try again." : "No password, ever.")
                 .font(LWFont.mono(9.5)).tracking(0.76)
                 .foregroundStyle(ink.opacity(auth.offline ? 0.75 : 0.58))
                 .multilineTextAlignment(.center).padding(.top, 4)
@@ -64,11 +67,32 @@ struct LoginView: View {
         .padding(.bottom, 26)
     }
 
+    /// Outlined secondary, per the handoff's rule for additional providers: Apple keeps the fill.
+    private var google: some View {
+        let loading = auth.phase == .loading
+        return Button { pending = .google; auth.signInWithGoogle() } label: {
+            HStack(spacing: 9) {
+                if loading && pending == .google {
+                    ProgressView().controlSize(.small).tint(ink)
+                } else {
+                    Text("G").font(LWFont.archivo(16, weight: 700)).frame(width: 17)
+                    Text("Continue with Google").font(LWFont.archivo(14, weight: 600))
+                }
+            }
+            .foregroundStyle(ink.opacity(0.85))
+            .frame(maxWidth: .infinity).frame(height: 44)
+            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(ink.opacity(0.22), lineWidth: 1))
+            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .buttonStyle(.plain).disabled(loading)
+        .accessibilityIdentifier("login.google").accessibilityLabel("Continue with Google")
+    }
+
     private var apple: some View {
         let loading = auth.phase == .loading
-        return Button { auth.signIn() } label: {
+        return Button { pending = .apple; auth.signIn() } label: {
             HStack(spacing: 9) {
-                if loading {
+                if loading && pending == .apple {
                     ProgressView().controlSize(.small).tint(ground)      // the label colour on an ink fill is the ground
                 } else {
                     Image(systemName: "applelogo").font(.system(size: 17)).frame(width: 17, height: 20)
