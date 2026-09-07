@@ -118,17 +118,27 @@ struct LoginView: View {
         }
     }
 
+    /// Both rows share one content width so the two glyphs land on the same x. Centring
+    /// each row independently would stagger them, since the labels differ in width.
+    private func providerRow<I: View>(_ icon: I, _ title: String, spinning: Bool, tint: Color) -> some View {
+        HStack(spacing: 9) {
+            if spinning {
+                ProgressView().controlSize(.small).tint(tint)
+            } else {
+                icon.frame(width: 20, height: 20)
+                Text(title).font(LWFont.archivo(15, weight: 700))
+            }
+        }
+        .frame(width: 196, alignment: spinning ? .center : .leading)
+    }
+
     private var apple: some View {
         let loading = auth.phase == .loading
         return Button { pending = .apple; auth.signIn() } label: {
-            HStack(spacing: 9) {
-                if loading && pending == .apple {
-                    ProgressView().controlSize(.small).tint(ground)   // label colour on an ink fill is the ground
-                } else {
-                    Image(systemName: "applelogo").font(.system(size: 17)).frame(width: 18, height: 20)
-                    Text("Continue with Apple").font(LWFont.archivo(15, weight: 700))
-                }
-            }
+            providerRow(
+                // the leaf makes the mark read high in its box; a point down optically centres it
+                Image(systemName: "applelogo").font(.system(size: 17)).offset(y: -1),
+                "Continue with Apple", spinning: loading && pending == .apple, tint: ground)
             .foregroundStyle(ground)
             .frame(maxWidth: .infinity).frame(height: 52)
             .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(ink))
@@ -141,14 +151,8 @@ struct LoginView: View {
     private var google: some View {
         let loading = auth.phase == .loading
         return Button { pending = .google; auth.signInWithGoogle() } label: {
-            HStack(spacing: 9) {
-                if loading && pending == .google {
-                    ProgressView().controlSize(.small).tint(ink)
-                } else {
-                    GoogleG(size: 18)
-                    Text("Continue with Google").font(LWFont.archivo(15, weight: 700))
-                }
-            }
+            providerRow(GoogleG(size: 18), "Continue with Google",
+                        spinning: loading && pending == .google, tint: ink)
             .foregroundStyle(ink.opacity(0.9))
             .frame(maxWidth: .infinity).frame(height: 52)
             .background(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(ink.opacity(0.22), lineWidth: 1))
@@ -175,7 +179,7 @@ private struct GoogleG: View {
         Canvas { ctx, s in
             let c = CGPoint(x: s.width / 2, y: s.height / 2)
             let outer = min(s.width, s.height) / 2
-            let weight = outer * 0.58
+            let weight = outer * 0.44          // the ring must stay open: the hole is the letter
             let r = outer - weight / 2
 
             func arc(_ from: Double, _ to: Double, _ hex: UInt32) {
@@ -188,10 +192,9 @@ private struct GoogleG: View {
             arc(44, 132, 0x34A853)                  // green, the bottom
             arc(132, 206, 0xFBBC05)                 // yellow, the left
 
-            // the crossbar, which is why the ring has a flat entry on the right
+            // the crossbar: same weight as the ring, from the centre out to the right edge
             var bar = Path()
-            bar.addRect(CGRect(x: c.x - weight * 0.1, y: c.y - weight * 0.40,
-                               width: outer + weight * 0.1, height: weight * 0.80))
+            bar.addRect(CGRect(x: c.x, y: c.y - weight / 2, width: outer, height: weight))
             ctx.fill(bar, with: .color(Color(lwHex(0x4285F4))))
         }
         .frame(width: size, height: size)
