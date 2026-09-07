@@ -214,6 +214,23 @@ import Observation
         guard let r = activeRoutine(), !r.entries.isEmpty else { return nil }
         return (r.pointer, r.orderedEntries.count, r.cyclesCompleted + 1)
     }
+    /// The most recently trained loop workout's e1RM index against its own previous
+    /// outing. Each workout recurs once per loop, so consecutive sessions of one
+    /// workout ARE a cycle apart — this is the login screen's proof the loop works.
+    func cycleProof() -> (pct: Double, workout: String)? {
+        guard let r = activeRoutine() else { return nil }
+        var best: (date: Date, pct: Double, name: String)?
+        for id in r.orderedEntries.map(\.workoutID) {
+            let rs = analysis.sessionsPerGroup[id.uuidString] ?? []
+            guard rs.count >= 2, let last = rs.last, let prev = rs.dropLast().last,
+                  let li = last.index, let pi = prev.index, pi > 0,
+                  let name = workout(id)?.name else { continue }
+            let row = (last.date, (li - pi) / pi * 100, name)
+            if best == nil || row.0 > best!.date { best = row }
+        }
+        return best.map { ($0.pct, $0.name) }
+    }
+
     /// Chronological e1RM workout-index series across every loop workout — the hero chart.
     func routineIndexSeries() -> [Double] {
         guard let r = activeRoutine() else { return [] }
