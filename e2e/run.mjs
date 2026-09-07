@@ -383,6 +383,50 @@ await step('logo-longpress', async () => {
   return `${v0} → ${v1} → ${v2}`;
 });
 
+await step('account-open', async () => {
+  const ms = await go(await onScreen('home.logo'), id('account.signout'));   // the page mark is the account button
+  await id('account.sessions').waitForExist({ timeout: 3000 });
+  await id('account.streak').waitForExist({ timeout: 2000 });
+  await id('account.import').waitForExist({ timeout: 2000 });
+  await sleep(400); await shot('account');
+  return `${ms}ms`;
+});
+await step('account-appearance', async () => {
+  const on = async (m) => await id(`account.appearance.${m}`).getAttribute('selected');
+  await id('account.appearance.light').click(); await sleep(600);
+  if ((await on('light')) !== 'true') throw new Error(`light not selected (${await on('light')})`);
+  await shot('account-light');
+  await id('account.appearance.dark').click(); await sleep(600);             // leave the board dark for later shots
+  if ((await on('dark')) !== 'true') throw new Error('dark not restored');
+  return 'light → dark applies immediately';
+});
+await step('account-back', async () => { const ms = await go(id('account.back'), id('home.start')); return `${ms}ms`; });
+await step('sign-out-in', async () => {
+  await go(await onScreen('home.logo'), id('account.signout'));
+  await id('account.signout').click();
+  const confirm = driver.$('-ios class chain:**/XCUIElementTypeAlert/**/XCUIElementTypeButton[`label == "Sign out"`]');
+  await confirm.waitForExist({ timeout: 4000 }); await confirm.click();
+  await id('login.apple').waitForExist({ timeout: 6000 }); await sleep(700); await shot('login');
+  const ms = await go(id('login.apple'), id('home.start'), 12000);           // the stub flips the mock state after a beat
+  return `${ms}ms`;
+});
+await step('login-offline', async () => {
+  await driver.execute('mobile: terminateApp', { bundleId: 'com.vaibhavgautam.lightweight' }).catch(() => {});
+  await new Promise(r => setTimeout(r, 800));
+  await driver.execute('mobile: launchApp', { bundleId: 'com.vaibhavgautam.lightweight', arguments: [...LAUNCH_ARGS, '--signed-out', '--auth-offline'] });
+  await id('login.caption').waitForExist({ timeout: 10000 });
+  await id('login.apple').click(); await sleep(1800);                        // fails the way a cancel does: no toast, button back
+  const caption = await id('login.caption').getAttribute('label');
+  await shot('login-offline');
+  if (!/No connection/.test(caption || '')) throw new Error(`caption did not swap: ${caption}`);
+  if (!(await id('login.apple').isEnabled())) throw new Error('apple button stayed disabled after failure');
+  await driver.execute('mobile: terminateApp', { bundleId: 'com.vaibhavgautam.lightweight' }).catch(() => {});
+  await new Promise(r => setTimeout(r, 800));
+  await driver.execute('mobile: launchApp', { bundleId: 'com.vaibhavgautam.lightweight', arguments: LAUNCH_ARGS });
+  await onScreen('home.start', 12000);
+  return caption;
+});
+
 await step('deeplink', async () => {
   await driver.execute('mobile: deepLink', { url: 'lightweight://calendar', bundleId: 'com.vaibhavgautam.lightweight' });
   await sleep(900);
