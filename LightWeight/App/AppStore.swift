@@ -20,6 +20,13 @@ import Observation
     @ObservationIgnored private var workoutsCache: [Workout] = []
     @ObservationIgnored private var workoutsByID: [UUID: Workout] = [:]
     @ObservationIgnored private var workoutsTick = -1
+    /// Same disease as workout(_:), worse: activeRoutine() has 26 call sites and the slots
+    /// feature added more, while liveSession()/anySession() fetched ALL 471 sessions and
+    /// filtered in memory. Both showed up in the device profile as NSSQLGenerator and
+    /// CDSwiftResult.make during rendering.
+    @ObservationIgnored private var routinesCache: [Routine] = []
+    @ObservationIgnored private var draftsCache: [Session] = []
+    @ObservationIgnored private var routinesTick = -1
 
     private var sessionsCache: [Session] = []            // finished, chronological
     private var sessionsByID: [UUID: Session] = [:]
@@ -116,15 +123,15 @@ import Observation
     func allExercises() -> [Exercise] { exercisesCache }
     func finishedSessions() -> [Session] { sessionsCache }
     func sessionsNewestFirst() -> [Session] { sessionsCache.reversed() }
-    func draftSession() -> Session? { ((try? context.fetch(FetchDescriptor<Session>())) ?? []).first { $0.isDraft } }
+    func draftSession() -> Session? { ensureRoutines(); return draftsCache.first }
     /// The minimized in-progress session, if any. Reads the observable id so views track liveness.
     func liveSession() -> Session? {
         guard let id = liveSessionID else { return nil }
-        return ((try? context.fetch(FetchDescriptor<Session>())) ?? []).first { $0.id == id && $0.isDraft }
+        ensureRoutines(); return draftsCache.first { $0.id == id }
     }
     /// Any session by id, straight from the store — usable before `reload()` has refreshed the cache.
     func anySession(_ id: UUID) -> Session? {
-        ((try? context.fetch(FetchDescriptor<Session>())) ?? []).first { $0.id == id }
+        { ensureRoutines(); return sessionsByID[id] ?? draftsCache.first { $0.id == id } }()
     }
     /// A fresh draft begins its life here (the Fresh page's slider).
     func markLive(_ s: Session) { s.isStarted = true; s.startedAt = .now; liveSessionID = s.id; try? context.save(); startLiveActivity(s) }
@@ -265,7 +272,13 @@ import Observation
     }
     func workouts() -> [Workout] { ensureWorkouts(); return workoutsCache }
     func workout(_ id: UUID?) -> Workout? { ensureWorkouts(); return id.flatMap { workoutsByID[$0] } }
-    func activeRoutine() -> Routine? { ((try? context.fetch(FetchDescriptor<Routine>())) ?? []).first { $0.isActive } }
+    private func ensureRoutines() {
+        guard routinesTick != dataTick else { return }
+        routinesCache = (try? context.fetch(FetchDescriptor<Routine>())) ?? []
+        draftsCache = ((try? context.fetch(FetchDescriptor<Session>())) ?? []).filter(\.isDraft)
+        routinesTick = dataTick
+    }
+    func activeRoutine() -> Routine? { ensureRoutines(); return routinesCache.first { $0.isActive } }
     func sessionCount(workoutID: UUID) -> Int { sessionCounts[workoutID] ?? 0 }
     func exercise(_ id: String) -> Exercise? { exercisesByID[id] }
     func result(_ s: Session) -> SessionResult? { analysis.results[s.id] }

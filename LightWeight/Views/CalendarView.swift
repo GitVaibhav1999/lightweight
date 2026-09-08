@@ -143,29 +143,51 @@ struct AllHistory: View {
                     }
                 }
                 if shown < sessions.count {
-                    // Explicit, because both implicit triggers cascade: onAppear fires when a
-                    // view enters the render tree (which includes SwiftUI's off-screen buffer)
-                    // and onChange fires again as each growth moves the sentinel. Either way the
-                    // window ran to the end in one pass — 96 rows on arrival instead of 50.
-                    Button {
-                        shown = min(shown + Self.pageSize, sessions.count)
-                    } label: {
-                        HStack(spacing: 6) {
-                            Text("Show \(min(Self.pageSize, sessions.count - shown)) more")
-                                .font(LWFont.body(13, weight: 600)).foregroundStyle(LW.accent)
-                            Text("\(sessions.count - shown) older")
-                                .font(LWFont.mono(9.5)).foregroundStyle(LW.ink(0.35))
+                    // onAppear and onChange both fire for rows sitting in SwiftUI's off-screen
+                    // render buffer, so either one cascaded the window to the end in a single
+                    // pass. onScrollVisibilityChange fires on actual visibility inside the
+                    // scroll view, so growing pushes the skeleton back out of view and it
+                    // settles — which is what makes auto-load work without running away.
+                    HistorySkeleton(rows: min(3, sessions.count - shown))
+                        .onScrollVisibilityChange(threshold: 0.15) { visible in
+                            guard visible else { return }
+                            shown = min(shown + Self.pageSize, sessions.count)
                         }
-                        .frame(maxWidth: .infinity).frame(height: 52).contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("history.more")
+                        .accessibilityIdentifier("history.more")
+                        .accessibilityLabel("Loading older sessions")
                 }
             }
         }
     }
 }
 
+
+/// Placeholder in the shape of the rows it precedes, so the list does not jump when they
+/// arrive. Breathes rather than shimmers — a moving highlight over a long list is noise.
+struct HistorySkeleton: View {
+    var rows: Int
+    @State private var dim = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    var body: some View {
+        VStack(spacing: 0) {
+            ForEach(0..<max(1, rows), id: \.self) { _ in
+                HStack(spacing: 12) {
+                    RoundedRectangle(cornerRadius: 3).frame(width: 96, height: 9)
+                    Spacer()
+                    RoundedRectangle(cornerRadius: 3).frame(width: 62, height: 8)
+                    RoundedRectangle(cornerRadius: 3).frame(width: 34, height: 8)
+                }
+                .foregroundStyle(LW.ink(dim ? 0.05 : 0.11))
+                .frame(height: 42)
+                .overlay(alignment: .top) { Hairline() }
+            }
+        }
+        .onAppear {
+            guard !reduceMotion else { return }
+            withAnimation(.easeInOut(duration: 0.85).repeatForever(autoreverses: true)) { dim = true }
+        }
+    }
+}
 
 /// Swipe a row left to reveal Delete. The row and the button live in ONE strip that slides,
 /// so the button is genuinely where it looks — an offset overlay never took the taps reliably.
