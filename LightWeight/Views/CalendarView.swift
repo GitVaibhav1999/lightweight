@@ -13,6 +13,12 @@ struct CalendarView: View {
     /// lot — tapping 6M/YEAR/ALL rebuilt the whole page. Each part now owns its own state,
     /// so a change reaches only what it affects. The pager renders this page twice, which
     /// doubles whatever is left.
+    /// DEBUG bisect: tap the month title to cycle which sections render, so the section
+    /// responsible for the scroll cost can be identified in one install instead of one
+    /// build per hypothesis. Five reasoned fixes did not find it; this will.
+    @AppStorage("cal.only") private var only = 0
+    private var modes: [String] { ["all", "no history", "no charts", "no strip", "grid only"] }
+
     var body: some View {
         let _ = store.dataTick
         Screen(top: 102, underBar: true) {
@@ -20,14 +26,23 @@ struct CalendarView: View {
                 HeaderScroll(page: .calendar) {
                     VStack(alignment: .leading, spacing: 0) {
                         MonthHeading(month: month)
-                        YearStrip(weeks: 53, cell: 5.2, radius: 1.7, rowGap: 2.6, fadeTo: 0.26)
-                            .environment(store)
-                            .padding(.top, 16)
-                            .accessibilityIdentifier("year.strip")
+                        #if DEBUG
+                        Button { only = (only + 1) % modes.count } label: {
+                            Text("§ \(modes[only])").font(LWFont.mono(9)).tracking(1)
+                                .foregroundStyle(LW.accent).padding(.vertical, 4)
+                                .contentShape(Rectangle())
+                        }.buttonStyle(.plain).accessibilityIdentifier("cal.bisect")
+                        #endif
+                        if only < 3 {
+                            YearStrip(weeks: 53, cell: 5.2, radius: 1.7, rowGap: 2.6, fadeTo: 0.26)
+                                .environment(store)
+                                .padding(.top, 16)
+                                .accessibilityIdentifier("year.strip")
+                        }
                         MonthGrid(month: month).padding(.top, 16)
                         ImportReceipt()
-                        PinnedProgression()
-                        AllHistory().padding(.top, 22)
+                        if only < 2 { PinnedProgression() }
+                        if only < 1 { AllHistory().padding(.top, 22) }
                         if store.finishedSessions().isEmpty { EmptyCalendarCard { importing = true } }
                         Color.clear.frame(height: 90)
                     }
