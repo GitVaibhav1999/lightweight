@@ -112,6 +112,35 @@ is null` — verified as an **Index Only Scan**, and verified across 120 rows / 
 zero duplicates and correct ordering. URL-encode the timestamp; its `+00:00` offset
 otherwise decodes as a space.
 
+## Summaries
+
+The client pages history 50 at a time, so it never holds the whole history. A 60-day chart,
+a streak or a lifetime total must therefore not require the rows behind them.
+
+| View | Row shape | Used by |
+|---|---|---|
+| `session_totals` | one per finished session, sets/volume/minutes rolled up | the base the others build on |
+| `daily_summary` | one per day | the 60-day chart, year strip, streak |
+| `user_totals` | one per user | account page headline numbers |
+| `workout_totals` | one per workout | Home cards, routine hero |
+
+```
+GET /rest/v1/daily_summary?select=day,sessions,sets,volume,minutes
+  &day=gte.<60 days ago>&order=day.desc
+```
+
+Verified: a 60-day window returns **43 rows** rather than the sessions and thousands of set
+logs underneath them.
+
+**Views, not a rollup table.** A table needs a trigger on every `set_logs` write and is wrong
+the moment one is missed; these are computed on read and cannot drift. PostgREST serves a view
+exactly like a table, so if one becomes slow it can be made a materialized view with no client
+change at all.
+
+**`security_invoker = true` is load-bearing.** A Postgres view runs as its *owner* by default,
+which bypasses RLS — without it every user would read everyone else's totals. Verified: a second
+user and anon both get `[]` from all four views while the owner still sees their own.
+
 ## The friends decision (open)
 
 Every policy today is one shape:

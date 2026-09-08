@@ -113,14 +113,21 @@ struct CalendarView: View {
 struct AllHistory: View {
     @Environment(AppStore.self) private var store
     @Environment(Router.self) private var router
+    /// A LazyVStack only defers the *body* of a row. Each row here owns a swipe gesture and
+    /// its own state, and 470 of those is enough to stall the scroll on device. Render a page
+    /// at a time and grow when the reader reaches the end.
+    @State private var shown = pageSize
+    private static let pageSize = 50
+
     var body: some View {
         let sessions = store.sessionsNewestFirst()
+        let visible = sessions.prefix(shown)
         // Calendar.current builds a calendar on each access; this ran once per row.
         let cal = Calendar.current
         VStack(alignment: .leading, spacing: 0) {
             Text("All history · \(sessions.count) sessions").lwLabel(10, tracking: 0.14).padding(.bottom, 4)
             LazyVStack(alignment: .leading, spacing: 0) {
-                ForEach(Array(sessions.enumerated()), id: \.element.id) { i, s in
+                ForEach(Array(visible.enumerated()), id: \.element.id) { i, s in
                     if i == 0 || !cal.isDate(s.startedAt, equalTo: sessions[i - 1].startedAt, toGranularity: .month) {
                         Text(Fmt.date(s.startedAt, "MMMM yyyy") + " ↓").font(LWFont.mono(10)).foregroundStyle(LW.ink(0.3)).frame(height: 34, alignment: .bottomLeading).padding(.bottom, 4)
                     }
@@ -134,6 +141,17 @@ struct AllHistory: View {
                             if st == .up || st == .best { Icon(kind: .arrowUp, size: 12, color: LW.accent, weight: 2) } else { Color.clear.frame(width: 12, height: 12) }
                         }.font(LWFont.mono(11)).foregroundStyle(LW.ink(0.45)).frame(height: 42).overlay(alignment: .top) { Hairline() }.contentShape(Rectangle())
                     }
+                }
+                if shown < sessions.count {
+                    // The sentinel is inside the lazy stack, so it only appears when the reader
+                    // actually gets here — which is what makes this load-on-demand and not a timer.
+                    HStack {
+                        Spacer()
+                        Text("\(sessions.count - shown) older").font(LWFont.mono(9.5)).foregroundStyle(LW.ink(0.3))
+                        Spacer()
+                    }
+                    .frame(height: 44)
+                    .onAppear { shown = min(shown + Self.pageSize, sessions.count) }
                 }
             }
         }
