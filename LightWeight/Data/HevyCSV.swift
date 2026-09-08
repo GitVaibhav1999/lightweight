@@ -2,7 +2,7 @@ import Foundation
 
 /// Pure parser for Hevy's "Export data" CSV. One row per set; sessions keyed by (title, start_time).
 enum HevyCSV {
-    struct Set { var index: Int; var type: String; var kg: Double?; var reps: Int?; var seconds: Int?; var rpe: Double? }
+    struct Set { var index: Int; var type: String; var kg: Double?; var reps: Int?; var seconds: Int?; var rpe: Double?; var distanceKm: Double? }
     struct Exercise { var name: String; var supersetID: String?; var notes: String?; var sets: [Set] }
     struct Session { var title: String; var start: Date; var end: Date; var key: String; var notes: String?; var exercises: [Exercise] }
 
@@ -35,7 +35,8 @@ enum HevyCSV {
                 exercises[key, default: [:]][name] = Exercise(name: name, supersetID: f(r, "superset_id").isEmpty ? nil : f(r, "superset_id"), notes: f(r, "exercise_notes").isEmpty ? nil : f(r, "exercise_notes"), sets: [])
             }
             exercises[key]![name]!.sets.append(Set(index: Int(f(r, "set_index")) ?? 0, type: f(r, "set_type").isEmpty ? "normal" : f(r, "set_type"),
-                                                 kg: Double(f(r, "weight_kg")), reps: Int(f(r, "reps")), seconds: Int(f(r, "duration_seconds")), rpe: Double(f(r, "rpe"))))
+                                                 kg: Double(f(r, "weight_kg")), reps: Int(f(r, "reps")), seconds: Int(f(r, "duration_seconds")),
+                                                 rpe: Double(f(r, "rpe")), distanceKm: Double(f(r, "distance_km"))))
         }
         return order.map { k in
             var s = sessions[k]!

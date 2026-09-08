@@ -85,6 +85,9 @@ import SwiftData
     // session from an under-recovered one — both raise srpe. This is what breaks the tie.
     var prs: Int? = nil              // 0-10
     var edited: Bool = false         // numbers corrected after finishing (Session Updates §4)
+    // Hevy `description`. Not named `description`: that shadows CustomStringConvertible
+    // and would silently change what interpolating a Session prints.
+    var note: String? = nil
     @Relationship(deleteRule: .cascade, inverse: \SessionExercise.session) var exercises: [SessionExercise]
 
     init(title: String, workoutID: UUID?, startedAt: Date, source: String) {
@@ -101,6 +104,7 @@ import SwiftData
     var order: Int
     var exerciseID: String
     var exerciseName: String
+    var note: String? = nil          // Hevy exercise_notes
     var session: Session?
     @Relationship(deleteRule: .cascade, inverse: \SetLog.exercise) var sets: [SetLog]
 
@@ -118,7 +122,8 @@ import SwiftData
     var seconds: Int?
     var done: Bool
     var isPR: Bool = false
-    var skipped: Bool = false                   // focus mode: moved past without checking — never a logged zero
+    var skipped: Bool = false
+    var distanceKm: Double? = nil    // Hevy distance_km — cardio and loaded carries                   // focus mode: moved past without checking — never a logged zero
     var exercise: SessionExercise?
 
     init(index: Int, type: String = "normal", kg: Double?, reps: Int?, seconds: Int? = nil, done: Bool = true) {

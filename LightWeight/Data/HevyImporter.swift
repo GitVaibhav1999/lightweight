@@ -28,16 +28,18 @@ import SwiftData
         for p in parsed {
             if existingKeys.contains(p.key) { report.skipped += 1; continue }
             let s = Session(title: p.title, workoutID: nil, startedAt: p.start, source: "hevy")
-            s.endedAt = p.end; s.isDraft = false; s.hevyKey = p.key
+            s.endedAt = p.end; s.isDraft = false; s.hevyKey = p.key; s.note = p.notes
             context.insert(s)
             for (i, ex) in p.exercises.enumerated() {
                 let bodyweight = ex.sets.allSatisfy { $0.kg == nil }
                 let e = resolve(ex.name, bodyweight: bodyweight)
                 let se = SessionExercise(order: i, exerciseID: e.id, exerciseName: e.source == "custom" ? e.name : ex.name)
+                se.note = ex.notes
                 se.session = s
                 context.insert(se)
                 for st in ex.sets {
                     let log = SetLog(index: st.index, type: st.type, kg: st.kg, reps: st.reps, seconds: st.seconds, done: true)
+                    log.distanceKm = st.distanceKm
                     log.exercise = se; context.insert(log)
                 }
             }

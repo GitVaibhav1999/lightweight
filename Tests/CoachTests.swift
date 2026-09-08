@@ -40,6 +40,49 @@ final class CoachTests: XCTestCase {
 }
 
 @MainActor
+final class HevyImportFidelityTests: XCTestCase {
+    /// The parser always read these; the importer dropped them on the floor.
+    func testImportCarriesNotesAndDistance() throws {
+        let csv = """
+        "title","start_time","end_time","description","exercise_title","superset_id","exercise_notes","set_index","set_type","weight_kg","reps","distance_km","duration_seconds","rpe"
+        "Legs","1 Apr 2023, 20:34","1 Apr 2023, 21:30","felt strong","Squat (Barbell)","","knees ok",0,"normal",100,5,,,
+        "Legs","1 Apr 2023, 20:34","1 Apr 2023, 21:30","felt strong","Squat (Barbell)","","knees ok",1,"normal",100,5,,,
+        "Legs","1 Apr 2023, 20:34","1 Apr 2023, 21:30","felt strong","Farmer Walk","","heavy",0,"normal",40,,0.25,60,
+        """
+        let store = AppStore(inMemory: true)
+        let report = try HevyImporter.importCSV(csv, into: store.context)
+        XCTAssertEqual(report.imported, 1)
+
+        let all = ((try? store.context.fetch(FetchDescriptor<Session>())) ?? [])
+        let s = try XCTUnwrap(all.first { $0.hevyKey == "Legs|1 Apr 2023, 20:34" })
+        XCTAssertEqual(s.note, "felt strong", "session description must survive the import")
+
+        let squat = try XCTUnwrap(s.orderedExercises.first { $0.exerciseName.contains("Squat") })
+        XCTAssertEqual(squat.note, "knees ok", "exercise notes must survive the import")
+
+        let walk = try XCTUnwrap(s.orderedExercises.first { $0.exerciseName.contains("Farmer") })
+        XCTAssertEqual(walk.orderedSets.first?.distanceKm, 0.25, "distance must survive the import")
+        XCTAssertNil(squat.orderedSets.first?.distanceKm, "a lift has no distance")
+    }
+
+    /// Re-import is a no-op, so the notes are not duplicated or wiped on a second run.
+    func testReimportIsIdempotent() throws {
+        let csv = """
+        "title","start_time","end_time","description","exercise_title","superset_id","exercise_notes","set_index","set_type","weight_kg","reps","distance_km","duration_seconds","rpe"
+        "Legs","1 Apr 2023, 20:34","1 Apr 2023, 21:30","felt strong","Squat (Barbell)","","knees ok",0,"normal",100,5,,,
+        """
+        let store = AppStore(inMemory: true)
+        _ = try HevyImporter.importCSV(csv, into: store.context)
+        let second = try HevyImporter.importCSV(csv, into: store.context)
+        XCTAssertEqual(second.imported, 0)
+        XCTAssertEqual(second.skipped, 1)
+        let matching = ((try? store.context.fetch(FetchDescriptor<Session>())) ?? [])
+            .filter { $0.hevyKey == "Legs|1 Apr 2023, 20:34" }
+        XCTAssertEqual(matching.count, 1, "a second import must not duplicate the session")
+    }
+}
+
+@MainActor
 final class RoutineFlowTests: XCTestCase {
     func testAddToRoutineNeverDuplicatesActives() throws {
         let store = AppStore(inMemory: true)
