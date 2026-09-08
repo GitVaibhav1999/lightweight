@@ -231,23 +231,37 @@ struct YearStrip: View {
     var fadeTo: Double
     private static let bestFill = lwDyn(lwHex(0xC7D584), lwHex(0x3C4433))
     private static var iso: Calendar { var c = Calendar(identifier: .iso8601); c.firstWeekday = 2; return c }
+    /// epochDay -> did any session that day set a record. Rebuilt only when the data
+    /// changes: it costs a startOfDay per session, and the strip's body re-evaluates on
+    /// every layout pass, including while scrolling.
+    @State private var dayState: [Int: Bool] = [:]
+    @State private var builtFor = -1
+
+    /// A week is 7 days, always. Once the first column's epoch day is known every other
+    /// cell is arithmetic — the old code asked Calendar for 371 dates and 371 startOfDays
+    /// on each pass, which is what made the strip expensive rather than the session count.
+    private func rebuild() {
+        let cal = Self.iso
+        dayState = Dictionary(
+            store.finishedSessions().map { s in
+                (Int(cal.startOfDay(for: s.startedAt).timeIntervalSince1970 / 86_400),
+                 store.result(s)?.state == .best)
+            }, uniquingKeysWith: { $0 || $1 })
+        builtFor = store.dataTick
+    }
+
     var body: some View {
         let cal = Self.iso
         let thisWeek = cal.dateInterval(of: .weekOfYear, for: store.today)!.start
-        let dayState: [Int: Bool] = Dictionary(                        // epochDay -> any-PR that day
-            store.finishedSessions().map { s -> (Int, Bool) in
-                (Int(cal.startOfDay(for: s.startedAt).timeIntervalSince1970 / 86_400), store.result(s)?.state == .best)
-            }, uniquingKeysWith: { $0 || $1 })
+        let firstEpoch = Int(cal.startOfDay(for: thisWeek).timeIntervalSince1970 / 86_400) - (weeks - 1) * 7
         let todayEpoch = Int(cal.startOfDay(for: store.today).timeIntervalSince1970 / 86_400)
         GeometryReader { g in
             let gap = max(0, (g.size.width - CGFloat(weeks) * cell) / CGFloat(weeks - 1))
             HStack(spacing: gap) {
                 ForEach(0..<weeks, id: \.self) { c in
-                    let weekStart = cal.date(byAdding: .weekOfYear, value: c - weeks + 1, to: thisWeek)!
                     VStack(spacing: rowGap) {
                         ForEach(0..<7, id: \.self) { r in
-                            let day = cal.date(byAdding: .day, value: r, to: weekStart)!
-                            let e = Int(cal.startOfDay(for: day).timeIntervalSince1970 / 86_400)
+                            let e = firstEpoch + c * 7 + r
                             let ramp = 0.5 + 0.42 * Double(c) / Double(weeks - 1)
                             ZStack {
                                 if let best = dayState[e] {
@@ -265,5 +279,7 @@ struct YearStrip: View {
                                  startPoint: .leading, endPoint: .trailing))
         }
         .frame(height: cell * 7 + rowGap * 6)
+        .onAppear { if builtFor != store.dataTick { rebuild() } }
+        .onChange(of: store.dataTick) { _, _ in rebuild() }
     }
 }
