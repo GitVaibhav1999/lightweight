@@ -143,15 +143,23 @@ struct AllHistory: View {
                     }
                 }
                 if shown < sessions.count {
-                    // The sentinel is inside the lazy stack, so it only appears when the reader
-                    // actually gets here — which is what makes this load-on-demand and not a timer.
-                    HStack {
-                        Spacer()
-                        Text("\(sessions.count - shown) older").font(LWFont.mono(9.5)).foregroundStyle(LW.ink(0.3))
-                        Spacer()
+                    // Explicit, because both implicit triggers cascade: onAppear fires when a
+                    // view enters the render tree (which includes SwiftUI's off-screen buffer)
+                    // and onChange fires again as each growth moves the sentinel. Either way the
+                    // window ran to the end in one pass — 96 rows on arrival instead of 50.
+                    Button {
+                        shown = min(shown + Self.pageSize, sessions.count)
+                    } label: {
+                        HStack(spacing: 6) {
+                            Text("Show \(min(Self.pageSize, sessions.count - shown)) more")
+                                .font(LWFont.body(13, weight: 600)).foregroundStyle(LW.accent)
+                            Text("\(sessions.count - shown) older")
+                                .font(LWFont.mono(9.5)).foregroundStyle(LW.ink(0.35))
+                        }
+                        .frame(maxWidth: .infinity).frame(height: 52).contentShape(Rectangle())
                     }
-                    .frame(height: 44)
-                    .onAppear { shown = min(shown + Self.pageSize, sessions.count) }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("history.more")
                 }
             }
         }
