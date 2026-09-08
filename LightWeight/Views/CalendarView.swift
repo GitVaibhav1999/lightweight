@@ -267,10 +267,14 @@ struct SwipeDeleteRow<Content: View>: View {
 
     var body: some View {
         let x = min(0, max(-reveal, (open ? -reveal : 0) + drag))
-        GeometryReader { g in
+        // No GeometryReader. One per row forces a layout pass per row and defeats SwiftUI's
+        // sizing shortcuts; at 50 rows — doubled by the pager — that was measurable in the
+        // trace alongside the per-row gestures. Negative trailing padding hangs the Delete
+        // button off the right edge instead of measuring the width to place it.
+        Group {
             HStack(spacing: 0) {
                 content
-                    .frame(width: g.size.width)
+                    .frame(maxWidth: .infinity)
                     .contentShape(Rectangle())
                     .onTapGesture {
                         if open || swiped { withAnimation(.easeOut(duration: 0.2)) { open = false } } else { onTap() }
@@ -288,6 +292,7 @@ struct SwipeDeleteRow<Content: View>: View {
                 }.buttonStyle(.plain)
                 .accessibilityIdentifier("history.delete")
             }
+            .padding(.trailing, -reveal)
             .offset(x: x)
             .simultaneousGesture(
                 DragGesture(minimumDistance: 6)
