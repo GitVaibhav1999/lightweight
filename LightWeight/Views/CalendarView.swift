@@ -115,11 +115,13 @@ struct AllHistory: View {
     @Environment(Router.self) private var router
     var body: some View {
         let sessions = store.sessionsNewestFirst()
+        // Calendar.current builds a calendar on each access; this ran once per row.
+        let cal = Calendar.current
         VStack(alignment: .leading, spacing: 0) {
             Text("All history · \(sessions.count) sessions").lwLabel(10, tracking: 0.14).padding(.bottom, 4)
             LazyVStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(sessions.enumerated()), id: \.element.id) { i, s in
-                    if i == 0 || !Calendar.current.isDate(s.startedAt, equalTo: sessions[i - 1].startedAt, toGranularity: .month) {
+                    if i == 0 || !cal.isDate(s.startedAt, equalTo: sessions[i - 1].startedAt, toGranularity: .month) {
                         Text(Fmt.date(s.startedAt, "MMMM yyyy") + " ↓").font(LWFont.mono(10)).foregroundStyle(LW.ink(0.3)).frame(height: 34, alignment: .bottomLeading).padding(.bottom, 4)
                     }
                     SwipeDeleteRow(onTap: { router.push(.summary(s.id)) }, onDelete: { store.deleteSession(s) }) {

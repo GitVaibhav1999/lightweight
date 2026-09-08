@@ -36,14 +36,23 @@ enum LWFont {
     private static let wght = NSNumber(value: 0x77676874 as UInt32)
     private static let wdth = NSNumber(value: 0x77647468 as UInt32)
 
+    /// Memoised: building a CTFont means a descriptor and a font instantiation, and a list
+    /// asks for the same handful of faces once per text view per row. A 470-session history
+    /// was doing that ~1,900 times a pass. The axes are the identity, so the key is exact.
+    nonisolated(unsafe) private static var faces: [String: Font] = [:]
+
     /// Archivo variable font with explicit weight (100–900) and width (75–125) axes.
     static func archivo(_ size: CGFloat, weight: CGFloat = 400, width: CGFloat = 100) -> Font {
+        let key = "\(size)|\(weight)|\(width)"
+        if let f = faces[key] { return f }
         let attrs: [CFString: Any] = [
             kCTFontFamilyNameAttribute: "Archivo",
             kCTFontVariationAttribute: [wght: weight, wdth: width] as CFDictionary,
         ]
         let desc = CTFontDescriptorCreateWithAttributes(attrs as CFDictionary)
-        return Font(CTFontCreateWithFontDescriptor(desc, size, nil))
+        let font = Font(CTFontCreateWithFontDescriptor(desc, size, nil))
+        faces[key] = font
+        return font
     }
     /// Display: Archivo 900 at 85–90 % width — the big workout names.
     static func display(_ size: CGFloat, width: CGFloat = 88) -> Font { archivo(size, weight: 900, width: width) }
