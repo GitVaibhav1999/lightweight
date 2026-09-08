@@ -64,6 +64,39 @@ final class RoutineFlowTests: XCTestCase {
         XCTAssertEqual(store.activeRoutine()?.pointer, 0, "loop must wrap")
         XCTAssertEqual(store.activeRoutine()?.cyclesCompleted, 1)
     }
+    func testDeletingALoopWorkoutRepairsTheLoop() throws {
+        let store = AppStore(inMemory: true)
+        let a = Workout(name: "Legs"), b = Workout(name: "Push"), c = Workout(name: "Back")
+        for w in [a, b, c] { store.context.insert(w); store.addToRoutine(w) }
+        store.finish(store.startSession(from: a))           // pointer -> 1
+        XCTAssertEqual(store.activeRoutine()?.pointer, 1)
+
+        store.deleteWorkout(b)                               // delete the one it is pointing at
+
+        let r = try XCTUnwrap(store.activeRoutine())
+        XCTAssertEqual(r.orderedEntries.count, 2, "the deleted workout's entry must go with it")
+        XCTAssertEqual(r.orderedEntries.map(\.order), [0, 1], "order must close its gap, not keep a hole")
+        XCTAssertFalse(r.orderedEntries.contains { $0.workoutID == b.id })
+        XCTAssertEqual(r.pointer, 0, "a part-finished cycle whose composition changed is not that cycle")
+        // the bug: a stale pointer indexes a surviving entry and serves the wrong workout
+        XCTAssertEqual(store.nextWorkout()?.id, a.id)
+        let p = try XCTUnwrap(store.routineProgress())
+        XCTAssertLessThanOrEqual(p.done, p.total, "progress must never report a place past the end")
+    }
+
+    func testDeletingAWorkoutOutsideTheLoopLeavesThePointer() throws {
+        let store = AppStore(inMemory: true)
+        let a = Workout(name: "Legs"), b = Workout(name: "Push"), loose = Workout(name: "Arms")
+        for w in [a, b] { store.context.insert(w); store.addToRoutine(w) }
+        store.context.insert(loose)                          // never added to the routine
+        store.finish(store.startSession(from: a))            // pointer -> 1
+
+        store.deleteWorkout(loose)
+
+        XCTAssertEqual(store.activeRoutine()?.pointer, 1, "deleting an unrelated workout must not reset the cycle")
+        XCTAssertEqual(store.nextWorkout()?.id, b.id)
+    }
+
     func testDuplicateActivesHealOnReload() throws {
         let store = AppStore(inMemory: true)
         let w = Workout(name: "Legs"); store.context.insert(w)

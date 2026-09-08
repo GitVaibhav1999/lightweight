@@ -117,8 +117,5 @@ struct WorkoutsView: View {
         r.pointer = 0; try? store.context.save(); store.dataTick += 1
     }
     private func add(_ w: Workout, to r: Routine?) { store.addToRoutine(w) }
-    private func delete(_ w: Workout, _ r: Routine?) {
-        for e in r?.entries.filter({ $0.workoutID == w.id }) ?? [] { store.context.delete(e) }
-        store.context.delete(w); try? store.context.save(); store.dataTick += 1
-    }
+    private func delete(_ w: Workout, _ r: Routine?) { store.deleteWorkout(w) }
 }

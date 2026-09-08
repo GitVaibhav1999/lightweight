@@ -209,6 +209,27 @@ import Observation
                             lastVolume: last?.volume ?? 0, bestVolume: rs.map(\.volume).max() ?? 0,
                             lastIndex: last?.index, bestIndex: rs.compactMap(\.index).max(), lastDate: last?.date)
     }
+    /// Deleting a workout that sits in the loop has to repair the loop, not just drop the
+    /// rows: close the gap left in `order`, and park the pointer. A pointer left aiming at a
+    /// position that no longer exists makes nextWorkout() serve the wrong workout silently,
+    /// and routineProgress() report a place in the cycle that cannot be reached.
+    func deleteWorkout(_ w: Workout) {
+        let r = activeRoutine()
+        // SwiftData keeps deleted objects in the relationship until save, so the survivors
+        // have to be identified by reference rather than re-read from r.entries.
+        let doomed = (r?.entries ?? []).filter { $0.workoutID == w.id }
+        for e in doomed { context.delete(e) }
+        context.delete(w)
+        if let r, !doomed.isEmpty {
+            let left = r.orderedEntries.filter { e in !doomed.contains { $0 === e } }
+            for (i, x) in left.enumerated() { x.order = i }
+            // A part-finished cycle whose composition changed is no longer that cycle.
+            // Matches what removing an entry already does.
+            r.pointer = 0
+        }
+        try? context.save(); dataTick += 1
+    }
+
     /// (sessions done in the current cycle, loop length, 1-based cycle number)
     func routineProgress() -> (done: Int, total: Int, cycle: Int)? {
         guard let r = activeRoutine(), !r.entries.isEmpty else { return nil }
