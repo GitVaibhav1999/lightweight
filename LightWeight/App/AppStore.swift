@@ -303,6 +303,57 @@ import Observation
         guard (analysis.exerciseHistory[exerciseID]?.count ?? 0) >= Engine.prMinPrior else { return false }
         return Engine.e1rm(kg: kg, reps: reps) > (analysis.bestE1RM[exerciseID] ?? 0)
     }
+
+    // MARK: focus mode — the table and the one-set-at-a-time view are two views over one session
+    /// The set focus is parked on, as a row id the table can scroll to. Switching views must not lose the place.
+    var focusRowID: String?
+    /// "<session>|<exercise>" keys that already had their reward moment — at most one per exercise per session.
+    @ObservationIgnored var focusRewarded: Set<String> = []
+    static func rowID(_ se: SessionExercise, _ st: SetLog) -> String { "row.\(se.order).\(st.index)" }
+
+    /// The single write behind a checked set — table row and focus check both land here.
+    /// Nothing typed accepts the prefilled (last-time) numbers; a skip mark clears.
+    func check(_ set: SetLog, exerciseID: String, prev: (Double?, Int)?) {
+        if set.kg == nil, let p = prev { set.kg = p.0 }
+        if set.reps == nil, let p = prev { set.reps = p.1 }
+        set.done = true
+        set.skipped = false
+        let localBest = (set.exercise?.sets ?? []).filter { $0.done && $0.index != set.index }
+            .map { Engine.e1rm(kg: $0.kg, reps: $0.reps ?? 0) }.max() ?? 0
+        let v = Engine.e1rm(kg: set.kg, reps: set.reps ?? 0)
+        set.isPR = isPR(exerciseID: exerciseID, kg: set.kg, reps: set.reps ?? 0) && v > localBest
+        try? context.save()
+        updateLiveActivity(set.exercise?.session)
+    }
+    func uncheck(_ set: SetLog) {
+        set.done = false; set.isPR = false
+        try? context.save()
+        updateLiveActivity(set.exercise?.session)
+    }
+    func setWeight(_ set: SetLog, _ kg: Double?) {
+        set.kg = kg; try? context.save(); updateLiveActivity(set.exercise?.session)
+    }
+    func setReps(_ set: SetLog, _ reps: Int) {
+        set.reps = max(0, reps); try? context.save(); updateLiveActivity(set.exercise?.session)
+    }
+    /// Left behind without a check. Cleared by `check`, so coming back and checking undoes it.
+    func markSkipped(_ set: SetLog) {
+        guard !set.done, !set.skipped else { return }
+        set.skipped = true
+        try? context.save()
+    }
+
+    /// Focus mode's reward test: a weight best for the exercise, or ≥1.5 % over its previous best e1RM.
+    /// Returns what the overlay prints about the record it just broke.
+    func newBest(exerciseID: String, kg: Double?, reps: Int) -> (e1rm: Double, prev: Double, date: Date?, pct: Double)? {
+        let history = analysis.exerciseHistory[exerciseID] ?? []
+        guard let top = history.max(by: { $0.e1rm < $1.e1rm }), top.e1rm > 0 else { return nil }
+        let v = Engine.e1rm(kg: kg, reps: reps)
+        let pct = (v - top.e1rm) / top.e1rm * 100
+        let heaviest = history.compactMap(\.kg).max() ?? 0
+        guard (kg ?? 0) > heaviest || pct >= 1.5 else { return nil }
+        return (v, top.e1rm, top.date, pct)
+    }
     /// Unchecked sets are dropped; exercises left with no sets are dropped with them.
     func finish(_ s: Session) {
         cancelRest()                                   // session end kills the timer, keeps the preset

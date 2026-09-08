@@ -79,9 +79,13 @@ struct RootView: View {
     }
 
     /// `--screen s0…s8` mirrors the design board's `?screen=` so every frame can be screenshotted directly.
+    /// `--focus on|off` pins which live-session view opens, since the switch is a sticky user preference.
     private func applyDebugScreen() {
         #if DEBUG
         let args = CommandLine.arguments
+        if let f = args.firstIndex(of: "--focus"), f + 1 < args.count {
+            UserDefaults.standard.set(args[f + 1] == "on", forKey: FocusMode.key)
+        }
         guard let i = args.firstIndex(of: "--screen"), i + 1 < args.count else { return }
         let next = store.nextWorkout(); let last = store.sessionsNewestFirst().first
         switch args[i + 1] {

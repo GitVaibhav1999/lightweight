@@ -315,7 +315,8 @@ extension AppStore {
             // the user's own jump: the median positive step they have actually taken on this lift
             var steps: [Double] = []
             for (a, b) in zip(loads, loads.dropFirst()) where b > a { steps.append(((b - a) * 100).rounded() / 100) }
-            let own = steps.sorted().dropFirst(steps.count / 2).first
+            // snapped: the median of raw differences is an artifact of how the data was logged
+            let own = Self.snapStep(steps.sorted().dropFirst(steps.count / 2).first, equip)
             var atTop = 0
             if let hi = slot?.repHi {
                 for h in hist.reversed() { if h.2 >= hi { atTop += 1 } else { break } }
@@ -361,6 +362,30 @@ extension AppStore {
                 belowFloor: below, sessionsAtLoad: atLoad, vector: vector)
         }
     }
+    /// The jumps the equipment can actually make. A step the gym cannot produce is not
+    /// advice, however good the arithmetic behind it — you cannot add 1.25 kg to a dumbbell.
+    /// Empty means the load is not adjustable at all and progress has to come from reps.
+    static func stepLadder(_ equipment: String?) -> [Double] {
+        switch (equipment ?? "").lowercased() {
+        case let e where e.contains("body weight") || e.contains("assisted"): return []
+        case let e where e.contains("band"): return []
+        case let e where e.contains("dumbbell"): return [2, 2.5, 4, 5]          // per bell, as racks are built
+        case let e where e.contains("barbell") || e.contains("smith"): return [2.5, 5, 10, 20]   // pairs of plates
+        case let e where e.contains("cable") || e.contains("machine") || e.contains("leverage"): return [2.5, 5, 10]
+        default: return [2.5, 5, 10]
+        }
+    }
+
+    /// Nearest rung the equipment actually has. Imported history carries pound-denominated
+    /// jumps (2.5 lb = 1.13 kg), so a median of raw load differences lands on numbers that
+    /// describe the data and exist nowhere in the gym.
+    static func snapStep(_ v: Double?, _ equipment: String?) -> Double? {
+        guard let v, v > 0 else { return nil }
+        let rungs = stepLadder(equipment)
+        guard !rungs.isEmpty else { return nil }
+        return rungs.min { abs($0 - v) < abs($1 - v) }
+    }
+
     /// Only used when the user has no history of their own on that lift.
     private static func defaultStep(_ equipment: String?) -> Double? {
         switch (equipment ?? "").lowercased() {
@@ -611,7 +636,16 @@ extension AppStore {
         guard let facts = (try? JSONDecoder().decode(Ctx.self, from: Data(ctx.utf8)))?.progression, !facts.isEmpty
         else { return actions }
         return actions.filter { a in
-            guard a.type == "weight" else { return true }        // step, loadType, repRange and the rest pass through
+            // A proposed step has to be a rung the equipment has. The model reasons in
+            // percentages, which is sound arithmetic and useless if the number cannot be loaded.
+            if a.type == "step" {
+                guard let p = facts.first(where: { $0.name == a.exercise }),
+                      let want = Double(a.to ?? ""),
+                      Self.stepLadder(p.equipment).contains(where: { abs($0 - want) < 0.01 })
+                else { coachLog("dropped step for \(a.exercise): \(a.to ?? "?") is not a real increment"); return false }
+                return true
+            }
+            guard a.type == "weight" else { return true }        // loadType, repRange and the rest pass through
             guard let p = facts.first(where: { $0.name == a.exercise }),
                   let lastTop = p.topSets.last?.split(separator: "x").first, let from = Double(lastTop),
                   let target = a.to, let want = Double(target.split(separator: "x").first.map(String.init) ?? target)
@@ -1212,6 +1246,10 @@ struct CoachReadPanel: View {
         let isSkipped = skipped.contains(a.label)
         HStack(alignment: .center, spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
+                if !a.exercise.isEmpty {
+                    Text(a.exercise.uppercased()).font(LWFont.mono(8.5)).tracking(1)
+                        .foregroundStyle(LW.ink(isSkipped ? 0.25 : 0.45)).lineLimit(1)
+                }
                 Text(a.label).font(LWFont.mono(11)).foregroundStyle(LW.ink(isSkipped ? 0.4 : 0.85))
                 if let r = a.reason, !r.isEmpty { Text(r).font(LWFont.mono(9.5)).foregroundStyle(LW.ink(isSkipped ? 0.25 : 0.35)).lineLimit(1) }
             }

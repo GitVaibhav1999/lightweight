@@ -112,6 +112,7 @@ import SwiftData
     var seconds: Int?
     var done: Bool
     var isPR: Bool = false
+    var skipped: Bool = false                   // focus mode: moved past without checking — never a logged zero
     var exercise: SessionExercise?
 
     init(index: Int, type: String = "normal", kg: Double?, reps: Int?, seconds: Int? = nil, done: Bool = true) {

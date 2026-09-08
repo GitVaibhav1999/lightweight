@@ -16,10 +16,13 @@ struct ActiveSessionView: View {
     let sessionID: UUID
     @State private var confirmDiscard = false
     @State private var showDial = false
+    @AppStorage(FocusMode.key) private var focusOn = FocusMode.default
     private var restUp: Bool { store.restScreenUp && store.restAnchor != nil }
 
     var body: some View {
-        if let s = store.session(sessionID) { content(s) } else { Screen { Text("Session not found").foregroundStyle(LW.ink(0.5)) } }
+        if let s = store.session(sessionID) {
+            if focusOn { FocusSessionView(session: s) } else { content(s) }
+        } else { Screen { Text("Session not found").foregroundStyle(LW.ink(0.5)) } }
     }
 
     private func content(_ s: Session) -> some View {
@@ -39,9 +42,13 @@ struct ActiveSessionView: View {
                         }
                     }
                     Spacer()
-                    RestChip(showDial: $showDial)
-                }.frame(height: 28)
+                    HStack(spacing: 8) {
+                        RestChip(showDial: $showDial)
+                        FocusSwitch(on: $focusOn)
+                    }
+                }.frame(height: 30)
                 SessionProgressBar(session: s).padding(.top, 12)
+                ScrollViewReader { proxy in
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 20) {
                         ForEach(s.orderedExercises, id: \.persistentModelID) { se in SessionExerciseBlock(se: se) }
@@ -50,6 +57,11 @@ struct ActiveSessionView: View {
                     }.padding(.horizontal, 9)
                 }
                 .padding(.horizontal, -9).padding(.top, 12)
+                .onAppear {                                  // arriving from focus mode: land on the set it was parked on
+                    guard let row = store.focusRowID else { return }
+                    DispatchQueue.main.async { proxy.scrollTo(row, anchor: .center) }
+                }
+                }
                                 .overlay(alignment: .bottom) {
                     SlideToFinish(unchecked: { s.exercises.flatMap(\.sets).filter { !$0.done }.count }) {
                         store.finish(s); router.finishSplash = s.id                 // cover first
@@ -98,6 +110,7 @@ struct SessionExerciseBlock: View {
             ForEach(se.orderedSets, id: \.persistentModelID) { st in
                 SetRow(set: st, exerciseID: se.exerciseID, prev: st.index < prev.count ? prev[st.index] : nil, justAdded: st.index == newSetIndex)
                     .transition(.asymmetric(insertion: .move(edge: .top).combined(with: .opacity), removal: .opacity))
+                    .id(AppStore.rowID(se, st))            // focus mode's scroll target
             }
             AddSetRow(se: se) { newSetIndex = $0 }
         }
@@ -278,16 +291,10 @@ struct SetRow: View {
     /// ✓ with nothing typed accepts the prefilled (last-time) values. The reward moment fires if the set beats the all-time best.
     private func toggle() {
         if !set.done {
-            if kgText.isEmpty, let p = prev { set.kg = p.0; kgText = Fmt.kg(p.0) }
-            if repsText.isEmpty, let p = prev { set.reps = p.1; repsText = String(p.1) }
-            set.done = true
-            let localBest = (set.exercise?.sets ?? []).filter { $0.done && $0.index != set.index }.map { Engine.e1rm(kg: $0.kg, reps: $0.reps ?? 0) }.max() ?? 0
-            let v = Engine.e1rm(kg: set.kg, reps: set.reps ?? 0)
-            set.isPR = store.isPR(exerciseID: exerciseID, kg: set.kg, reps: set.reps ?? 0) && v > localBest
+            store.check(set, exerciseID: exerciseID, prev: prev)
+            kgText = set.kg.map(Fmt.kg) ?? ""; repsText = set.reps.map(String.init) ?? ""
             if set.isPR { UINotificationFeedbackGenerator().notificationOccurred(.success) } else { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
-        } else { set.done = false; set.isPR = false }
-        try? store.context.save()
-        store.updateLiveActivity(set.exercise?.session)
+        } else { store.uncheck(set) }
     }
 }
 

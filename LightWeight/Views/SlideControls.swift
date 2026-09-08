@@ -28,6 +28,7 @@ struct Jitter: ViewModifier {
 /// "SLIDE TO FINISH" — glass track, sage fill with inverted label, arrow thumb.
 struct SlideToFinish: View {
     var unchecked: () -> Int = { 0 }      // Session Updates §3: >0 arms a second-slide confirmation
+    var title = "SLIDE TO FINISH"         // focus mode's last set reads MARK & FINISH
     let onComplete: () -> Void
     @State private var p: CGFloat = 0
     @State private var dragging = false
@@ -48,11 +49,11 @@ struct SlideToFinish: View {
                         Text("\(unchecked()) unchecked set\(unchecked() == 1 ? "" : "s") will be dropped").font(LWFont.mono(9.5)).foregroundStyle(LW.ink(0.45))
                     }.frame(maxWidth: .infinity)
                 } else {
-                    Text(done ? "DONE" : "SLIDE TO FINISH").font(LWFont.body(13.5, weight: 700)).tracking(1.1).foregroundStyle(LW.accent).frame(maxWidth: .infinity)
+                    Text(done ? "DONE" : title).font(LWFont.body(13.5, weight: 700)).tracking(1.1).foregroundStyle(LW.accent).frame(maxWidth: .infinity)
                 }
                 Capsule().fill(LW.accent).frame(width: (w - 62) * p + 52).padding(3)
                     .overlay(alignment: .leading) {
-                        Text(done ? "DONE" : (armed ? "" : "SLIDE TO FINISH")).font(LWFont.body(13.5, weight: 700)).tracking(1.1).foregroundStyle(LW.inkOnAccent)
+                        Text(done ? "DONE" : (armed ? "" : title)).font(LWFont.body(13.5, weight: 700)).tracking(1.1).foregroundStyle(LW.inkOnAccent)
                             .frame(width: w).clipped()
                     }.clipShape(Capsule())
                 Circle().fill(armed ? Self.armedKnob : LW.accent).frame(width: 48, height: 48)

@@ -8,12 +8,13 @@ for (const f of fs.readdirSync(OUT)) if (/^\d\d-/.test(f)) fs.unlinkSync(OUT + f
 
 const driver = await remote({ hostname: '127.0.0.1', port: 4723, path: '/', logLevel: 'error', capabilities: {
   platformName: 'iOS', 'appium:automationName': 'XCUITest', 'appium:udid': UDID, 'appium:bundleId': 'com.vaibhavgautam.lightweight',
-  'appium:noReset': true, 'appium:processArguments': { args: ['--today', '2026-08-27', '--coach-fixture', '--coach-demo', '--coach-fail-once', '--mock-auth'] }, 'appium:newCommandTimeout': 300,
+  'appium:noReset': true, 'appium:processArguments': { args: ['--today', '2026-08-27', '--coach-fixture', '--coach-demo', '--coach-fail-once', '--mock-auth', '--focus', 'off'] }, 'appium:newCommandTimeout': 300,
   'appium:wdaLaunchTimeout': 300000, 'appium:waitForQuiescence': false } });
 
 // always start from a FRESH app process — and relaunch WITH the debug arguments:
 // activateApp drops processArguments (lost --today AND --coach-fixture → live API calls + real dates!)
-const LAUNCH_ARGS = ['--today', '2026-08-27', '--coach-fixture', '--coach-demo', '--coach-fail-once', '--mock-auth'];
+// --focus off: the switch is a sticky user preference and defaults ON, so every table step needs it pinned
+const LAUNCH_ARGS = ['--today', '2026-08-27', '--coach-fixture', '--coach-demo', '--coach-fail-once', '--mock-auth', '--focus', 'off'];
 await driver.execute('mobile: terminateApp', { bundleId: 'com.vaibhavgautam.lightweight' }).catch(() => {});
 await new Promise(r => setTimeout(r, 800));
 await driver.execute('mobile: launchApp', { bundleId: 'com.vaibhavgautam.lightweight', arguments: LAUNCH_ARGS });
@@ -286,6 +287,58 @@ await step('session-v2', async () => {
   lbl = await chip();
   if (lbl !== 'REST') throw new Error(`chip did not cancel: ${lbl}`);
   return `reps ${r0}->${r1} · +set ${c0}->${c1} · rest chip arms & cancels`;
+});
+await step('focus-switch', async () => {
+  const parked = async () => (await id('focus.set').getAttribute('label'));
+  await id('session.focus').click(); await sleep(600);
+  await onScreen('focus.screen', 6000);
+  await id('focus.weight').waitForExist({ timeout: 3000 });
+  await sleep(300); await shot('focus-set');
+  const kg = async () => (await id('focus.weight').getAttribute('value'));
+  const k0 = await kg();
+  await id('focus.weight.up').click(); await sleep(300);                 // chevrons step one unit
+  const k1 = await kg();
+  if (k0 === k1) throw new Error(`chevron did not step the weight (${k0})`);
+  await id('focus.weight.down').click(); await sleep(300);
+  const reps = async () => (await id('focus.reps').getAttribute('label'));
+  const r0 = await reps();
+  await id('focus.reps.plus').click(); await sleep(300);
+  if ((await reps()) === r0) throw new Error(`stepper did not bump reps (${r0})`);
+  await id('focus.reps.minus').click(); await sleep(250);
+  const s0 = await parked();
+  await id('focus.next').click(); await sleep(400);
+  if ((await parked()) === s0) throw new Error(`NEXT did not move off ${s0}`);
+  await id('focus.prev').click(); await sleep(400);
+  if ((await parked()) !== s0) throw new Error(`PREV did not come back to ${s0}`);
+  await id('session.focus').click(); await sleep(700);                   // and back to the table, same session
+  await id('slide.finish').waitForExist({ timeout: 6000 });
+  await id('set.check.0').waitForExist({ timeout: 3000 });
+  return `${s0} · weight ${k0}→${k1} · reps ${r0} bumped · round trip`;
+});
+await step('focus-rest', async () => {
+  await id('session.focus').click(); await sleep(600);
+  await onScreen('focus.check', 6000);
+  await id('focus.check').click(); await sleep(1200);
+  if (await id('focus.newbest').isExisting()) {                          // the reward covers the rest state until tapped
+    await shot('focus-newbest');
+    const w = await driver.getWindowSize();
+    await driver.performActions([{ type: 'pointer', id: 'f1', parameters: { pointerType: 'touch' }, actions: [
+      { type: 'pointerMove', duration: 0, x: Math.round(w.width / 2), y: Math.round(w.height / 2) },
+      { type: 'pointerDown', button: 0 }, { type: 'pause', duration: 60 }, { type: 'pointerUp', button: 0 } ] }]);
+    await driver.releaseActions(); await sleep(900);
+  }
+  await id('focus.skip').waitForExist({ timeout: 6000 });                // check re-lays the same screen out as rest
+  await sleep(400); await shot('focus-rest');
+  await id('session.focus').click(); await sleep(700);                   // one clock: the table's chip is counting the same rest
+  const chip = await id('rest.chip').getAttribute('label').catch(() => '?');
+  await id('session.focus').click(); await sleep(700);
+  await id('focus.skip').waitForExist({ timeout: 4000 });                // and focus comes back still resting
+  await id('focus.skip').click(); await sleep(700);
+  await id('focus.check').waitForExist({ timeout: 4000 });
+  await id('session.focus').click(); await sleep(700);
+  await id('slide.finish').waitForExist({ timeout: 6000 });
+  if (!/\d:\d\d/.test(chip)) throw new Error(`check did not arm the shared rest clock: ${chip}`);
+  return `check → rest ${chip} → skip → set`;
 });
 await step('session-scroll', async () => {
   // drag in the left gutter (row numbers, non-interactive) — mid-screen hits kg/reps fields which eat the pan
