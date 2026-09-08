@@ -129,9 +129,10 @@ struct StartLayer: View {
         return CGSize(width: card.minX - nameFrame.minX, height: card.minY - nameFrame.minY)
     }
 
+    /// The slot about to be trained, not the count behind it: "CYCLE 93 · 4 OF 6".
     private var eyebrow: String {
         guard let p = store.routineProgress() else { return "NEXT UP" }
-        return "CYCLE \(p.cycle) · \(p.done) OF \(p.total)"
+        return "CYCLE \(p.cycle) · \(min(p.done + 1, p.total)) OF \(p.total)"
     }
 
     /// ~3.2s door to door: 0.12s takeover · rise · hold with the reel stepping · 0.34s dissolve.

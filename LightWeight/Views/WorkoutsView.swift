@@ -14,7 +14,8 @@ struct WorkoutsView: View {
         let _ = store.dataTick
         let routine = store.activeRoutine()
         let entries = routine?.orderedEntries ?? []
-        let loopIDs = Set(entries.map(\.workoutID))
+        let slots = store.routineSlots()
+        let pointer = entries.isEmpty ? 0 : (routine?.pointer ?? 0) % entries.count
         let all = store.workouts().map { ($0, store.sessionCount(workoutID: $0.id)) }.sorted { ((store.isPinned($0.0.id) ? 1 : 0), $0.1) > ((store.isPinned($1.0.id) ? 1 : 0), $1.1) }
         Screen(top: 102, underBar: true) {
             VStack(alignment: .leading, spacing: 0) {
@@ -22,27 +23,41 @@ struct WorkoutsView: View {
                     VStack(alignment: .leading, spacing: 0) {
                         Text("WORKOUTS").font(LWFont.display(34, width: 85)).tracking(-0.7).padding(.top, 6).accessibilityIdentifier("page.workouts")
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
-                            Text("Routine").lwLabel(10, tracking: 0.14, color: LW.accent); Spacer()
+                            Text(entries.isEmpty ? "Routine" : "Routine · \(entries.count) slots").lwLabel(10, tracking: 0.14, color: LW.accent); Spacer()
                             Text(editing ? "drag to reorder · − removes" : "\(routine?.name ?? "No routine") · repeats in order").font(LWFont.mono(11)).foregroundStyle(LW.ink(0.45))
                         }.padding(.top, 16)
                         if entries.isEmpty { EmptyRoutineSlots() }
                         VStack(spacing: 0) {
-                            ForEach(Array(entries.enumerated()), id: \.element.persistentModelID) { i, e in
-                                if let w = store.workout(e.workoutID) {
+                            ForEach(slots) { s in
+                                if let w = store.workout(s.workoutID) {
+                                    let i = s.index
                                     HStack(spacing: 10) {
-                                        if editing { ReorderHandle(index: i, count: entries.count, rowHeight: 48, drag: $drag) { from, to in move(routine, from: from, to: to) } }
-                                        Text("\(i + 1)").font(LWFont.mono(11)).foregroundStyle(LW.ink(0.3)).frame(width: 12, alignment: .leading)
+                                        if editing { ReorderHandle(index: i, count: slots.count, rowHeight: 46, drag: $drag) { from, to in store.moveSlot(from: from, to: to) } }
+                                        Text("\(i + 1)").font(LWFont.mono(10)).foregroundStyle(i == pointer ? LW.accent : LW.ink(0.4)).frame(width: 12, alignment: .leading)
                                         Button { router.push(.workoutEdit(w.id)) } label: { Text(w.name).font(LWFont.body(14)).frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle()) }.buttonStyle(.plain).accessibilityIdentifier("routine.row")
-                                        if store.liveSession()?.workoutID == e.workoutID { Text("● LIVE").font(LWFont.mono(9.5)).tracking(1).foregroundStyle(LW.accent) }
-                                        else if i == (routine?.pointer ?? 0) % max(entries.count, 1) { Text("● NEXT").font(LWFont.mono(9.5)).tracking(1).foregroundStyle(LW.accent) }
+                                        if store.liveSession()?.workoutID == s.workoutID { Text("● LIVE").font(LWFont.mono(9.5)).tracking(1).foregroundStyle(LW.accent) }
+                                        // where else this workout takes a turn — absent when it takes only one
+                                        if s.repeated { Text("also \(s.alsoFills.map(String.init).joined(separator: ", "))").font(LWFont.mono(9)).foregroundStyle(LW.ink(0.35)).accessibilityIdentifier("routine.also.\(i)") }
                                         Text("\(w.slots.count) ex").font(LWFont.mono(11)).foregroundStyle(LW.ink(0.45))
-                                        if editing { Button { remove(e, from: routine) } label: { Icon(kind: .minusCircle, size: 14, color: LW.ink(0.35), weight: 1.7).frame(width: 28, height: 28).contentShape(Rectangle()) }.buttonStyle(.plain).accessibilityIdentifier("routine.remove.\(i)") }
-                                    }.frame(height: 48).overlay(alignment: .bottom) { Hairline() }
-                                    .reorderOffset(index: i, drag: drag, rowHeight: 48)
+                                        if editing { Button { store.removeSlot(s.entry) } label: { Icon(kind: .minusCircle, size: 14, color: LW.ink(0.35), weight: 1.7).frame(width: 28, height: 28).contentShape(Rectangle()) }.buttonStyle(.plain).accessibilityIdentifier("routine.remove.\(i)") }
+                                    }.frame(height: 46)
+                                    .background { if i == pointer { RoundedRectangle(cornerRadius: 10, style: .continuous).fill(LW.accent(0.06)).padding(.horizontal, -8) } }
+                                    .overlay(alignment: .bottom) { if i != pointer, i + 1 != pointer { Hairline() } }
+                                    .reorderOffset(index: i, drag: drag, rowHeight: 46)
+                                }
+                            }
+                            if editing, !entries.isEmpty {
+                                HStack(spacing: 12) {
+                                    Button { router.slotPicker = true } label: {
+                                        Text("+ Add slot").font(LWFont.body(14, weight: 600)).foregroundStyle(LW.accent)
+                                            .frame(height: 44).contentShape(Rectangle())
+                                    }.buttonStyle(.plain).accessibilityIdentifier("slot.add")
+                                    if store.routineHasRepeats() { Text("any workout, again is fine").font(LWFont.mono(9)).foregroundStyle(LW.ink(0.3)) }
+                                    Spacer()
                                 }
                             }
                         }.padding(.top, 4)
-                        
+
                         HStack(alignment: .firstTextBaseline, spacing: 14) {
                             Text("All workouts").lwLabel(10, tracking: 0.14); Spacer()
                             // the nav's + is gone, so the start sheet (and its empty session) lives here now
@@ -58,7 +73,7 @@ struct WorkoutsView: View {
                                 HStack(spacing: 12) {
                                     Button { router.push(.workoutEdit(w.id)) } label: { Text(w.name).font(LWFont.body(13.5)).frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle()) }.buttonStyle(.plain)
                                     Text("\(n)×").font(LWFont.mono(11)).foregroundStyle(LW.ink(0.45))
-                                    if editing, !loopIDs.contains(w.id) {
+                                    if editing {                       // already in the loop? another slot is fine
                                         Button { add(w, to: routine) } label: {
                                             ZStack {
                                                 Circle().strokeBorder(LW.accent(0.6), lineWidth: 1.2).frame(width: 24, height: 24)
@@ -100,22 +115,49 @@ struct WorkoutsView: View {
                     .ignoresSafeArea().allowsHitTesting(false)
             }
         }
-    }
-    /// Reorder the loop; the pointer follows the workout it was on.
-    private func move(_ r: Routine?, from: Int, to: Int) {
-        guard let r else { return }
-        var es = r.orderedEntries; let pointed = es.indices.contains(r.pointer) ? es[r.pointer].workoutID : nil
-        let e = es.remove(at: from); es.insert(e, at: to)
-        for (i, x) in es.enumerated() { x.order = i }
-        if let pointed, let i = es.firstIndex(where: { $0.workoutID == pointed }) { r.pointer = i }
-        try? store.context.save(); store.dataTick += 1
-    }
-    private func remove(_ e: RoutineEntry, from r: Routine?) {
-        guard let r else { return }
-        store.context.delete(e)
-        for (i, x) in r.orderedEntries.filter({ $0 !== e }).enumerated() { x.order = i }
-        r.pointer = 0; try? store.context.save(); store.dataTick += 1
+        .sheet(isPresented: $router.slotPicker) { SlotPickerSheet().environment(store).environment(router) }
     }
     private func add(_ w: Workout, to r: Routine?) { store.addToRoutine(w) }
     private func delete(_ w: Workout, _ r: Routine?) { store.deleteWorkout(w) }
+}
+
+/// "+ Add slot": every workout, pickable. One already in the loop simply takes another slot —
+/// that is the loop working, not a duplicate, so nothing warns and nothing is disabled.
+struct SlotPickerSheet: View {
+    @Environment(AppStore.self) private var store
+    @Environment(Router.self) private var router
+    var body: some View {
+        let slots = store.routineSlots()
+        ScrollView(showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text("ADD A SLOT").font(LWFont.display(24, width: 85)).tracking(-0.4).padding(.top, 22)
+                Text("ANY WORKOUT · AGAIN IS FINE").font(LWFont.mono(10)).tracking(1.4)
+                    .foregroundStyle(LW.ink(0.4)).padding(.top, 4).padding(.bottom, 10)
+                ForEach(store.workouts(), id: \.id) { w in
+                    let fills = slots.filter { $0.workoutID == w.id }.map { $0.index + 1 }
+                    Button {
+                        store.addToRoutine(w); router.slotPicker = false
+                    } label: {
+                        HStack(spacing: 10) {
+                            Text(Fmt.title(w.name)).font(LWFont.heading(17, width: 90)).tracking(-0.2)
+                                .lineLimit(1).minimumScaleFactor(0.6)
+                            Spacer(minLength: 8)
+                            if !fills.isEmpty {
+                                Text("slot \(fills.map(String.init).joined(separator: ", "))").font(LWFont.mono(10)).foregroundStyle(LW.ink(0.38))
+                            }
+                            Text("\(w.slots.count) ex").font(LWFont.mono(10)).foregroundStyle(LW.ink(0.38))
+                        }
+                        .padding(.vertical, 14).contentShape(Rectangle())
+                        .overlay(alignment: .bottom) { Hairline() }
+                    }.buttonStyle(.plain).accessibilityIdentifier("slot.pick.\(w.name)")
+                }
+                Color.clear.frame(height: 24)
+            }
+            .padding(.horizontal, LW.screenPad)
+        }
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(LW.bg)
+        .accessibilityElement(children: .contain).accessibilityIdentifier("slot.picker")
+    }
 }

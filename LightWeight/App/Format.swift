@@ -31,6 +31,11 @@ enum Fmt {
         let n = Calendar.current.dateComponents([.day], from: Calendar.current.startOfDay(for: d), to: Calendar.current.startOfDay(for: today)).day ?? 0
         return n <= 0 ? "today" : "\(n) d ago"
     }
+    /// "2nd this cycle" — a slot's turn among the ones its workout fills.
+    static func ordinal(_ n: Int) -> String {
+        let suffix = (11...13).contains(n % 100) ? "th" : ["th", "st", "nd", "rd", "th", "th", "th", "th", "th", "th"][n % 10]
+        return "\(n)\(suffix)"
+    }
     /// Display form of a workout name: uppercase, "and" → "&" like the board.
     static func title(_ s: String) -> String { s.replacingOccurrences(of: " and ", with: " & ").uppercased() }
     static func hoursMinutes(_ minutes: Int) -> String { "\(minutes / 60) h \(minutes % 60) m" }

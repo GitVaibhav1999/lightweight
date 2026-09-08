@@ -18,6 +18,7 @@ enum Route: Hashable {
     var pagingLocked = false           // true while a slider is being dragged
     var workoutsEditing = false        // Workouts page edit mode; toggled from the fixed header
     var startSheet = false
+    var slotPicker = false             // "+ Add slot" → pick the workout the new slot holds
     var startRequest: UUID?          // Home's START button → StartLayer raises the splash
     var heroNameFrame: CGRect = .zero   // the card's workout name, in global space — the splash flies from here
     var finishSplash: UUID?             // covers the summary while the engine catches up             // 3b: the detached + circle asks — saved workout or fresh

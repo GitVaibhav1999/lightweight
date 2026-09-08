@@ -10,7 +10,7 @@ struct HomeView: View {
         let routine = store.activeRoutine()
         let entries = routine?.orderedEntries ?? []
         let next = store.nextWorkout()
-        let others = store.workouts().count - entries.count
+        let others = store.workouts().count - Set(entries.map(\.workoutID)).count   // slots repeat; workouts do not
         let _ = store.coachTick
         let _ = store.dataTick
         Screen(top: 102, underBar: true) {
@@ -18,7 +18,7 @@ struct HomeView: View {
                 HeaderScroll(page: .home) {
                     VStack(alignment: .leading, spacing: 0) {
                         if let routine, !entries.isEmpty {
-                            RoutineHero(routine: routine, next: next).padding(.top, 6)
+                            RoutineHero(routine: routine).padding(.top, 6)
                             if let read = store.insightRead("cycle-\(routine.cyclesCompleted)") {
                                 CoachReadPanel(read: read, key: "cycle-\(routine.cyclesCompleted)", caption: store.insightCaption(),
                                                aid: "coach.insight", onReview: { router.show(.workouts) }).padding(.top, 14)
@@ -64,9 +64,11 @@ struct HomeView: View {
                             EmptyHome().padding(.top, 4)
                         }
                         if !entries.isEmpty { Text("This cycle").lwLabel(10, tracking: 0.16, color: LW.ink(0.35)).padding(.top, 22).padding(.bottom, 2) }
-                        ForEach(Array(entries.enumerated()), id: \.element.persistentModelID) { i, e in
-                            if let w = store.workout(e.workoutID) {
-                                WorkoutCard(workout: w, isNext: w.id == next?.id, pending: i > (routine?.pointer ?? 0))
+                        // Rows are workouts, not slots: the graph is the workout's, and it renders once
+                        // however many slots that workout fills. The dots say where those slots are.
+                        ForEach(uniqueWorkouts(), id: \.id) { slot in
+                            if let w = store.workout(slot.workoutID) {
+                                WorkoutCard(workout: w, slot: slot, done: routine?.pointer ?? 0)
                             }
                         }
                         if !entries.isEmpty { Hairline() }
@@ -84,42 +86,37 @@ struct HomeView: View {
         }
     }
 
-    /// Loop order starting at the pointer (next first).
-    private func rotated(_ entries: [RoutineEntry], _ r: Routine?) -> [RoutineEntry] {
-        guard let r, !entries.isEmpty else { return entries }
-        let p = r.pointer % entries.count
-        return Array(entries[p...] + entries[..<p])
+    /// Each workout once, at the slot it first fills.
+    private func uniqueWorkouts() -> [AppStore.Slot] {
+        var seen = Set<UUID>()
+        return store.routineSlots().filter { seen.insert($0.workoutID).inserted }
     }
 }
 
-/// "Hevy split · cycle 27 · 3/4 done" + segment bars + index trend + last/best/next-beat numbers.
+/// "ROUTINE · CYCLE 93 · 4 OF 6" + one bar per slot with its workout under it + cycle volume.
 struct RoutineHero: View {
     @Environment(AppStore.self) private var store
     let routine: Routine
-    let next: Workout?
 
     var body: some View {
         let progress = store.routineProgress()
+        let slots = store.routineSlots()
+        let done = progress?.done ?? 0
         let vols = store.cycleVolumes()
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text(vols.closed && routine.cyclesCompleted > 0 ? "\(routine.name) · cycle \(routine.cyclesCompleted) closed" : "\(routine.name) · cycle \(progress?.cycle ?? 1)").lwLabel(10, tracking: 0.16, color: LW.ink(0.4))
-                Spacer()
-                Text("\(progress?.done ?? 0) OF \(progress?.total ?? 0) DONE").font(LWFont.mono(10)).tracking(1).foregroundStyle(LW.accent)
-            }
-            HStack(spacing: 5) {
-                ForEach(0..<(progress?.total ?? 0), id: \.self) { i in
-                    Capsule().fill(i < (progress?.done ?? 0) ? LW.accent : LW.ink(0.1))   // done · next (outlined) · remaining track
-                        .overlay(Capsule().strokeBorder(i == progress?.done ? LW.accent(0.6) : .clear, lineWidth: 1))
-                        .frame(height: 2.5)
-                }
-            }
+        VStack(alignment: .leading, spacing: 9) {
+            (Text("ROUTINE · CYCLE \(progress?.cycle ?? 1) · ").foregroundStyle(LW.accent)
+             + Text("\(min(done + 1, max(slots.count, 1))) OF \(slots.count)").foregroundStyle(LW.ink))
+                .font(LWFont.mono(9)).tracking(9 * 0.22)
+                .accessibilityIdentifier("routine.eyebrow")
+            Text(Fmt.title(routine.name)).font(LWFont.display(22, width: 85)).tracking(-0.5)
+                .lineLimit(1).minimumScaleFactor(0.6)
+            SlotSegments(slots: slots, done: done)
             if vols.current > 0 || vols.prevBest != nil {
             HStack(alignment: .top) {
                 stat(grouped(vols.current), "CYCLE VOL", accent: true, align: .leading)
                 Spacer(minLength: 12)
                 stat(vols.prevBest.map { grouped($0) } ?? "—", "CYCLE BEST", accent: false, align: .trailing)
-            }.padding(.top, 8)
+            }.padding(.top, 4)
             }
         }
         .accessibilityElement(children: .contain).accessibilityIdentifier("routine.hero")
@@ -137,6 +134,46 @@ struct RoutineHero: View {
     }
 }
 
+/// One bar per slot, the workout's name under it. The ordinal (PUSH¹ PUSH²) appears only where a
+/// workout fills more than one slot — two workouts with different names are already told apart.
+struct SlotSegments: View {
+    let slots: [AppStore.Slot]
+    let done: Int
+    private var short: Bool { slots.count >= 8 }       // three letters still separate them
+    private var currentOnly: Bool { slots.count >= 12 }  // past a dozen, only the slot you are on
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 5) {
+                ForEach(slots) { s in
+                    Capsule().fill(bar(s.index)).frame(height: 4)
+                        .overlay { if s.index == done { Capsule().strokeBorder(LW.accentBright.opacity(0.35), lineWidth: 1.5).padding(-1.5) } }
+                }
+            }
+            HStack(spacing: 5) {
+                ForEach(slots) { s in label(s) }
+            }
+        }
+        .accessibilityElement(children: .contain).accessibilityIdentifier("routine.slots")
+    }
+    private func bar(_ i: Int) -> Color { i < done ? LW.accent : i == done ? LW.accentBright : LW.ink(0.14) }
+    private func tint(_ i: Int) -> Color { i < done ? LW.ink(0.58) : i == done ? LW.accentBright : LW.ink(0.4) }
+    @ViewBuilder private func label(_ s: AppStore.Slot) -> some View {
+        let name = Fmt.title(s.name)
+        let text = currentOnly && s.index != done ? "" : (short ? String(name.prefix(3)) : name)
+        HStack(spacing: 1) {
+            Text(text).font(LWFont.mono(8)).tracking(0.8)
+            if s.repeated, !text.isEmpty { Text("\(s.occurrence)").font(LWFont.mono(6)).offset(y: -3) }
+        }
+        .foregroundStyle(tint(s.index))
+        .lineLimit(1).minimumScaleFactor(0.6)
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("slot.label.\(s.index)")
+        .accessibilityLabel(name)
+        .accessibilityValue(s.repeated ? "turn \(s.occurrence) of \(s.fills.count)" : "")
+    }
+}
+
 /// 10a — the next workout is the page's centre of gravity: what it is, what it costs, one START.
 struct NextUpCard: View {
     @Environment(AppStore.self) private var store
@@ -144,11 +181,11 @@ struct NextUpCard: View {
     let workout: Workout
     var body: some View {
         let s = store.workoutStats(workout.id)
-        let sets = workout.orderedSlots.reduce(0) { $0 + $1.sets }
         let live = store.liveSession()
+        let slot = cycleSlot()
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 8) {
-                Text(live == nil ? "NEXT UP" : "IN PROGRESS").font(LWFont.mono(10)).tracking(1.8).foregroundStyle(LW.accent)
+                Text(live == nil ? eyebrow(slot) : "IN PROGRESS").font(LWFont.mono(10)).tracking(1.8).foregroundStyle(LW.accent)
                 Spacer()
                 Button { router.push(.workoutEdit(workout.id)) } label: {
                     Icon(kind: .more, size: 18, color: LW.ink(0.35), weight: 2.4)
@@ -156,15 +193,17 @@ struct NextUpCard: View {
                 }.buttonStyle(.plain)
                 .accessibilityIdentifier("next.more").accessibilityLabel("Edit \(workout.name)")
             }
-            Text(Fmt.title(workout.name))
-                .font(LWFont.display(23, width: 85)).tracking(-0.6)
-                .lineLimit(2).minimumScaleFactor(0.6).fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 6)
-                .background(GeometryReader { g in Color.clear
-                    .onAppear { router.heroNameFrame = g.frame(in: .global) }
-                    .onChange(of: g.frame(in: .global)) { _, f in router.heroNameFrame = f } })
-            Text(meta(s, sets)).font(LWFont.mono(10.5)).foregroundStyle(LW.ink(0.42))
-                .lineLimit(1).minimumScaleFactor(0.7).padding(.top, 8)
+            HStack(alignment: .lastTextBaseline, spacing: 9) {
+                Text(Fmt.title(workout.name))
+                    .font(LWFont.display(23, width: 85)).tracking(-0.6)
+                    .lineLimit(1).minimumScaleFactor(0.5)
+                    .background(GeometryReader { g in Color.clear
+                        .onAppear { router.heroNameFrame = g.frame(in: .global) }
+                        .onChange(of: g.frame(in: .global)) { _, f in router.heroNameFrame = f } })
+                Text(meta(s, slot)).font(LWFont.mono(10)).foregroundStyle(LW.ink(0.58))
+                    .lineLimit(1).minimumScaleFactor(0.7)
+                Spacer(minLength: 0)
+            }.padding(.top, 6)
             Text(exerciseLine).font(LWFont.mono(10.5)).foregroundStyle(LW.ink(0.5))
                 .lineLimit(2).fixedSize(horizontal: false, vertical: true).padding(.top, 6)
             if let live {                                     // same box, now the way back in
@@ -185,13 +224,9 @@ struct NextUpCard: View {
                 .accessibilityIdentifier("home.resume").accessibilityLabel("Resume \(workout.name)")
             } else {
                 Button { router.startRequest = workout.id } label: {
-                    HStack(spacing: 9) {
-                        BoltShape().fill(LW.inkOnAccent).frame(width: 13, height: 18)
-                        Text("Start").font(LWFont.heading(20, width: 92)).tracking(-0.2).foregroundStyle(LW.inkOnAccent)
-                    }
-                    .frame(maxWidth: .infinity).frame(height: 48)
-                    .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(LW.accent))
-                    .shadow(color: LW.accent(0.35), radius: 12, y: 2)        // a glow, kept inside the card
+                    Text("START").font(LWFont.heading(19, width: 92)).tracking(2.6).foregroundStyle(LW.inkOnAccent)
+                        .frame(maxWidth: .infinity).frame(height: 48)
+                        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(LW.accent))
                 }.buttonStyle(.plain).padding(.top, 13)
                 .accessibilityIdentifier("home.start").accessibilityLabel("Start \(workout.name)")
             }
@@ -209,10 +244,22 @@ struct NextUpCard: View {
         let head = names.prefix(3).joined(separator: " · ")
         return names.count > 3 ? head + " · +\(names.count - 3)" : head
     }
-    private func meta(_ s: AppStore.WorkoutStats, _ sets: Int) -> String {
-        var t = "\(workout.orderedSlots.count) EX · \(sets) SETS"
-        if s.lastVolume > 0 { t += " · last \(Fmt.int(s.lastVolume)) kg" }
-        if let d = s.lastDate { t += " · \(Fmt.ago(d, today: store.today))" }
+    /// The slot this card is about: the one the pointer stands on, or this workout's first.
+    private func cycleSlot() -> AppStore.Slot? {
+        let slots = store.routineSlots()
+        let at = store.routineProgress()?.done ?? 0
+        if let s = slots.first(where: { $0.index == at }), s.workoutID == workout.id { return s }
+        return slots.first { $0.workoutID == workout.id }
+    }
+    private func eyebrow(_ slot: AppStore.Slot?) -> String {
+        guard let slot, let p = store.routineProgress() else { return "NEXT UP" }
+        return "NEXT UP · \(store.routineHasRepeats() ? "SLOT " : "")\(slot.index + 1) OF \(p.total)"
+    }
+    /// "2nd this cycle · last 4 d ago" — the occurrence only where the workout has more than one turn.
+    private func meta(_ s: AppStore.WorkoutStats, _ slot: AppStore.Slot?) -> String {
+        let ago = s.lastDate.map { Fmt.ago($0, today: store.today) }
+        var t = ago.map { $0 == "today" ? "today" : "last \($0)" } ?? "no sessions yet"
+        if let slot, slot.repeated { t = "\(Fmt.ordinal(slot.occurrence)) this cycle · " + t }
         return t
     }
 }
@@ -247,13 +294,15 @@ struct RoutineChart: View {
     }
 }
 
-/// One workout of the loop: NAME · sparkline · when — verdict arrows · "3/6 up · vol · best".
+/// One workout of the loop: NAME · sparkline · a dot per slot it fills — verdict arrows, where it sits.
 struct WorkoutCard: View {
     @Environment(AppStore.self) private var store
     @Environment(Router.self) private var router
     let workout: Workout
-    let isNext: Bool
-    var pending = false            // later in the loop than the next workout — dimmed, not yet earned
+    let slot: AppStore.Slot?
+    var done = 0                   // slots finished this cycle
+    /// Nothing of this workout done yet this cycle — dimmed, not yet earned.
+    private var pending: Bool { !(slot?.fills ?? []).contains { $0 < done } }
     var body: some View {
         let s = store.workoutStats(workout.id)
         let series = (store.analysis.sessionsPerGroup[workout.id.uuidString] ?? []).map(\.volume)
@@ -262,25 +311,48 @@ struct WorkoutCard: View {
                 Hairline()
                 HStack(spacing: 7) {
                     Text(Fmt.title(workout.name)).font(LWFont.heading(15, width: 88)).tracking(-0.1)
-                        .foregroundStyle(pending ? LW.ink(0.55) : LW.ink)
+                        .foregroundStyle(LW.ink).opacity(pending ? 0.7 : 1)
                         .lineLimit(1).minimumScaleFactor(0.62)
                     if let r = s.lastResult, let last = s.last { VerdictIcon(verdict: overall(r, last), size: 13) }
                     Spacer(minLength: 8)
-                    Sparkline(values: series, lastIsBest: s.lastResult?.state == .best)
+                    Sparkline(values: series, lastIsBest: s.lastResult?.state == .best).opacity(pending ? 0.6 : 1)
                 }.padding(.top, 12)
-                Text(sub(s)).font(LWFont.mono(10)).foregroundStyle(store.liveSession()?.workoutID == workout.id ? LW.accent : LW.ink(0.35))
-                    .lineLimit(1).minimumScaleFactor(0.8).padding(.bottom, 14)
+                HStack(spacing: 7) {
+                    if let slot { slotDots(slot) }
+                    Text(status(s)).font(LWFont.mono(9)).tracking(0.9)
+                        .foregroundStyle(store.liveSession()?.workoutID == workout.id ? LW.accent : LW.ink(0.58))
+                        .lineLimit(1).minimumScaleFactor(0.8)
+                }.padding(.bottom, 14)
             }.contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("workout.card").accessibilityLabel(workout.name)
     }
-    /// "5 EX · 2 d ago" — what it costs and when you last did it.
-    private func sub(_ s: AppStore.WorkoutStats) -> String {
-        let ex = "\(workout.orderedSlots.count) EX"
-        if store.liveSession()?.workoutID == workout.id { return "\(ex) · live now" }
-        guard let d = s.lastDate else { return "\(ex) · no sessions yet" }
-        return "\(ex) · \(Fmt.ago(d, today: store.today))"
+    /// One dot per slot this workout fills: done · next (ring) · still to come.
+    private func slotDots(_ slot: AppStore.Slot) -> some View {
+        HStack(spacing: 3) {
+            ForEach(slot.fills, id: \.self) { i in
+                Group {
+                    if i < done { Circle().fill(LW.accent) }
+                    else if i == done { Circle().strokeBorder(LW.accentBright, lineWidth: 1.5) }
+                    else { Circle().fill(LW.ink(0.16)) }
+                }.frame(width: 6, height: 6)
+            }
+        }
+    }
+    /// "next" · "slot 3" · "1 of 2 · next" — where the workout stands in this cycle, then when it last ran.
+    private func status(_ s: AppStore.WorkoutStats) -> String {
+        var t = "slot \((slot?.index ?? 0) + 1)"
+        if let slot {
+            let fills = slot.fills
+            if fills.count > 1 {
+                t = "\(fills.filter { $0 < done }.count) of \(fills.count)" + (fills.contains(done) ? " · next" : "")
+            } else if let i = fills.first {
+                t = i < done ? "done" : i == done ? "next" : "slot \(i + 1)"
+            }
+        }
+        if store.liveSession()?.workoutID == workout.id { return "\(t) · live now" }
+        return t + (s.lastDate.map { " · \(Fmt.ago($0, today: store.today))" } ?? " · no sessions yet")
     }
     /// One arrow for the whole workout: up if anything moved, down only if nothing did.
     /// A workout's best is the workout's own record — its index beating the best that group

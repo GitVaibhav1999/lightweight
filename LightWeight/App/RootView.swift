@@ -94,6 +94,7 @@ struct RootView: View {
         case "s3": if let last { router.stack = [.summary(last.id)] }
         case "s4": if let id = last?.orderedExercises.first?.exerciseID { router.stack = [.exercise(id)] }
         case "s5": router.page = .workouts
+        case "s5e": router.page = .workouts; router.workoutsEditing = true    // the slot editor, mid-edit
         case "s6": if let next { router.page = .workouts; router.stack = [.workoutEdit(next.id)] }
         case "s7": if let next { router.page = .workouts; router.stack = [.workoutEdit(next.id), .picker(.workout(next.id))] }
         case "s8": router.page = .calendar
@@ -231,7 +232,8 @@ struct StartSheet: View {
     @Environment(Router.self) private var router
     var body: some View {
         let next = store.nextWorkout()
-        let cycle = (store.activeRoutine()?.orderedEntries ?? []).compactMap { store.workout($0.workoutID) }
+        var seen = Set<UUID>()          // a workout in two slots is still one thing to start
+        let cycle = (store.activeRoutine()?.orderedEntries ?? []).filter { seen.insert($0.workoutID).inserted }.compactMap { store.workout($0.workoutID) }
         let others = store.workouts().filter { w in !cycle.contains { $0.id == w.id } }
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {

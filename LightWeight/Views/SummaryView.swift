@@ -75,7 +75,7 @@ struct SummaryView: View {
                 }
                 Spacer(minLength: 10)
                 VStack(spacing: 10) {
-                    HStack(spacing: 0) { Text("Next up · ").foregroundStyle(LW.ink(0.45)); Text(Fmt.title(store.nextWorkout()?.name ?? "—")).foregroundStyle(LW.accent); Text(" · loop advanced").foregroundStyle(LW.ink(0.45)) }
+                    HStack(spacing: 0) { Text("NEXT · ").foregroundStyle(LW.ink(0.45)); Text(Fmt.title(store.nextWorkout()?.name ?? "—")).foregroundStyle(LW.accent); Text(nextSlot).foregroundStyle(LW.ink(0.45)) }
                         .font(LWFont.mono(11)).lineLimit(1).minimumScaleFactor(0.8).frame(maxWidth: .infinity)
                     Button { router.home() } label: {
                         Text("DONE").font(LWFont.body(15, weight: 800)).tracking(1).foregroundStyle(.black).frame(maxWidth: .infinity).frame(height: 56)
@@ -84,6 +84,12 @@ struct SummaryView: View {
                 }
             }
         }
+    }
+
+    /// " · SLOT 5 OF 6" — the loop already advanced, so the pointer IS the next slot.
+    private var nextSlot: String {
+        guard let p = store.routineProgress() else { return " · loop advanced" }
+        return " · \(store.routineHasRepeats() ? "SLOT " : "")\(min(p.done + 1, p.total)) OF \(p.total)"
     }
 
     private func stat<V: View>(_ label: String, @ViewBuilder _ value: () -> V) -> some View {

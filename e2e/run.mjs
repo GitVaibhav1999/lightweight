@@ -80,6 +80,19 @@ const ensureEdit = async (on) => {
   const editing = /Done editing/.test(await t.getAttribute('label'));
   if (editing !== on) { await t.click(); await sleep(450); }
 };
+/** scroll the page until the button is present AND vertically in view, then tap it */
+const tapInList = async (sel, tries = 5) => {
+  const win = await driver.getWindowSize();
+  for (let i = 0; i < tries; i++) {
+    const el = driver.$(`~${sel}`);
+    if (await el.isExisting().catch(() => false)) {
+      const l = await el.getLocation().catch(() => null);
+      if (l && l.y > 90 && l.y < win.height - 110) { await el.click(); return true; }
+    }
+    await driver.execute('mobile: swipe', { direction: 'up' }); await sleep(450);
+  }
+  throw new Error(`~${sel} never came into view`);
+};
 const swipeUp = async () => { const s = await driver.getWindowSize(); await driver.execute('mobile: dragFromToForDuration', { duration: 0.4, fromX: s.width / 2, fromY: s.height * 0.8, toX: s.width / 2, toY: s.height * 0.2 }); };
 
 await step('cleanup-live', async () => {
@@ -154,6 +167,43 @@ await step('loop-add', async () => {
   await ensureEdit(false);
   if ((await rows()) !== before) throw new Error('restore failed');
   return `${before} → ${after} → ${before} (edit-gated)`;
+});
+await step('slot-repeat', async () => {
+  const rows = async () => [...(await driver.getPageSource()).matchAll(/Button[^>]*name="routine.row"/g)].length;
+  await id('nav.tab.workouts').click(); await onScreen('page.workouts', 6000); await sleep(400);
+  await ensureEdit(true);                     // + Add slot lives in edit mode only
+  const src = await driver.getPageSource();
+  const already = /name="routine.row"[^>]*label="([^"]+)"/.exec(src)[1];   // a workout ALREADY in the loop
+  const before = await rows();
+  await id('slot.add').click(); await sleep(600);
+  await onScreen('slot.picker', 6000);
+  const pick = driver.$(`~slot.pick.${already}`);
+  for (let i = 0; i < 4 && !(await pick.isExisting()); i++) { await driver.execute('mobile: swipe', { direction: 'up' }); await sleep(400); }
+  await pick.click(); await sleep(800);       // picking one already in the loop just appends another slot
+  const after = await rows();
+  const also = await id('routine.also.0').isExisting();      // the repeat marks where else it takes a turn
+  await shot('routine-slots');
+  await tapInList(`routine.remove.${after - 1}`); await sleep(500);         // restore — a long loop pushes it below the fold
+  await ensureEdit(false);
+  if (after !== before + 1) throw new Error(`slot not appended (${before} → ${after})`);
+  if (!also) throw new Error('repeated slot carries no "also" marker');
+  if ((await rows()) !== before) throw new Error('restore failed');
+  return `${already} took slot ${after} · also marker · removed`;
+});
+await step('slot-ordinals', async () => {
+  await id('nav.tab.home').click(); await onScreen('routine.hero', 6000); await sleep(500);
+  const tags = [...(await driver.getPageSource()).matchAll(/<[^>]*name="slot\.label\.\d+"[^>]*>/g)].map(m => m[0]);
+  if (!tags.length) throw new Error('no slot labels under the hero');
+  const labels = tags.map(t => (/label="([^"]*)"/.exec(t) || [, ''])[1]);
+  // ordinals are additive: a label carries a turn if and only if that workout fills two slots
+  const byName = {};
+  tags.forEach((t, i) => { (byName[labels[i]] = byName[labels[i]] || []).push(t); });
+  for (const [name, ts] of Object.entries(byName)) {
+    const repeated = ts.length > 1;
+    for (const t of ts) if (/value="turn/.test(t) !== repeated) throw new Error(`${name}: ordinal ${repeated ? 'missing on' : 'without'} a repeat`);
+  }
+  await id('nav.tab.workouts').click(); await onScreen('page.workouts', 6000); await sleep(400);
+  return labels.join(' · ');
 });
 await step('workout-delete', async () => {
   await go(id('+ New workout'), id('edit.back')); await sleep(300);           // create

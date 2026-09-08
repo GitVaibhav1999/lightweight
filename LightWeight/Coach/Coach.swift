@@ -32,7 +32,7 @@ struct CoachRead: Codable { var headline: String; var body: String; var actions:
 struct SessionCoachResponse: Codable { var verdict: String; var p1: String; var p2: String?; var p3: String?; var actions: [CoachAction]? }
 struct CoachResponse: Codable { var text: String; var chips: [CoachChip]? }
 
-struct SplitWorkoutCtx: Codable { var name: String; var exercises: [String] }        // "Squat · quads · 3x8-12"
+struct SplitWorkoutCtx: Codable { var name: String; var exercises: [String]; var slots: [Int]? }   // "Squat · quads · 3x8-12"
 struct CycleTimingCtx: Codable { var cycle: Int; var days: Int; var avgRestDays: String; var sessionsPerWeek: String }
 struct CoachWorkoutCtx: Codable { var name: String; var sessions: Int; var stalled: Bool; var indexSeries: [String] }
 struct CycleRow: Codable { var cycle: Int; var vol: String; var sets: Int; var up: Int; var stalled: Int; var prs: Int }
@@ -56,8 +56,11 @@ struct ProgressionBrief: Codable {
 }
 struct SessionBrief: Codable { var workout: String; var date: String; var vol: String; var verdict: String; var topSets: [String]; var rpe: Int?; var srpe: Int?; var prs: Int? }
 struct CoachLandmarks: Codable { var bestCycleVol: String; var bestCycleNum: Int; var totalSessions: Int }
-struct WorkoutSessionsCtx: Codable { var name: String; var top: [String] }          // per-exercise top sets that cycle
+struct WorkoutSessionsCtx: Codable { var slot: Int; var name: String; var top: [String] }   // per-exercise top sets that cycle
 struct CycleDetail: Codable { var cycle: Int; var workouts: [WorkoutSessionsCtx] }
+/// One slot's own history across cycles, oldest first — so a heavy push¹ and a lighter push²
+/// are never averaged into one claim about "push".
+struct SlotSeriesCtx: Codable { var slot: Int; var workout: String; var occurrence: String; var vol: [String] }
 struct CoachContext: Codable {
     var routineName: String; var cycle: Int; var next: String
     var workouts: [CoachWorkoutCtx]
@@ -80,7 +83,8 @@ struct CoachContext: Codable {
     var split: [SplitWorkoutCtx]?          // the whole routine: each workout with its exercises + targets
     var timing: [CycleTimingCtx]?          // per cycle: days to complete, avg rest between sessions, sessions/week
     var catalog: [String: [String]]?       // bodyPart -> exercises available to ADD (not in the split)
-    var history: [CycleDetail]?            // EVERY cycle: each workout's per-exercise top sets
+    var history: [CycleDetail]?            // EVERY cycle: each workout's per-exercise top sets, by slot
+    var slots: [SlotSeriesCtx]?            // only where a workout fills more than one slot
 }
 
 protocol CoachClient {
@@ -172,7 +176,12 @@ struct LiveCoachClient: CoachClient {
         set curve before touching load. Where a lift set a record in the same session, bank that first, then make \
         the trade off; never open by correcting a session the client just won. \
         setCurves give every set, not just the top one: reps holding across sets means room to load, reps \
-        collapsing across sets means the load is already at the limit.
+        collapsing across sets means the load is already at the limit. \
+        SLOTS: the routine is an ordered list of slots and one workout can fill more than one, so a cycle \
+        can hold two sessions of the same workout on different days. history[].workouts carry a slot number: \
+        read a cycle against the one before it SLOT BY SLOT, slot 4 against slot 4, and never average a \
+        workout's two turns into one claim. Where slots[] is present it gives each slot its own volume \
+        series across cycles, oldest first; say which turn you mean, such as the second push of the cycle.
         """
         guard let raw = await complete(system: system, user: "DATA: \(context)\nTASK: \(hint)", maxTokens: 9000) else { return nil }
         if let r = try? JSONDecoder().decode(CoachRead.self, from: Data(raw.utf8)) { return r }
@@ -494,22 +503,36 @@ extension AppStore {
         var json = coachContextJSON()
         guard var ctx = try? JSONDecoder().decode(CoachContext.self, from: Data(json.utf8)), let r = activeRoutine() else { return json }
         let chunks = Array(cycleChunks().past.suffix(15))
+        // Sessions sit in slot order inside a cycle, so the slot number is the position — and it is
+        // what makes cycle-over-cycle a like-for-like read once one workout fills two slots.
         ctx.history = chunks.enumerated().map { i, chunk in
             CycleDetail(cycle: r.cyclesCompleted - (chunks.count - 1 - i),
-                        workouts: chunk.map { WorkoutSessionsCtx(name: $0.title, top: topSetStrings($0)) })
+                        workouts: chunk.enumerated().map { j, s in WorkoutSessionsCtx(slot: j + 1, name: s.title, top: topSetStrings(s)) })
+        }
+        let slots = routineSlots()
+        if routineHasRepeats() {
+            ctx.slots = slots.map { s in
+                SlotSeriesCtx(slot: s.index + 1, workout: s.name,
+                              occurrence: "\(s.occurrence) of \(s.fills.count)",
+                              vol: chunks.map { chunk in
+                                  chunk.indices.contains(s.index) ? Self.fmtVol(sessionVolume(chunk[s.index])) : "—" })
+            }
         }
         ctx.recent = []
         // Split, timing and catalog (coach upgrade 2026-09-04): judge rest/frequency and split adequacy; enable addExercise.
         let lib = (try? context.fetch(FetchDescriptor<Exercise>())) ?? []
         let byID = Dictionary(lib.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         var inSplit = Set<String>()
-        ctx.split = r.orderedEntries.compactMap { e in
-            guard let w = workout(e.workoutID) else { return nil }
+        var listed = Set<UUID>()
+        // Each workout once, with the slots it fills: the split is what the workouts contain,
+        // not how many turns they take.
+        ctx.split = slots.compactMap { slot in
+            guard listed.insert(slot.workoutID).inserted, let w = workout(slot.workoutID) else { return nil }
             return SplitWorkoutCtx(name: w.name, exercises: w.orderedSlots.map { s in
                 inSplit.insert(s.exerciseName.lowercased())
                 let t = byID[s.exerciseID]?.target ?? "?"
                 return "\(s.exerciseName) · \(t) · \(s.sets)x\(s.repLo)-\(s.repHi)"
-            })
+            }, slots: slot.repeated ? slot.fills.map { $0 + 1 } : nil)
         }
         let cal = Calendar.current
         ctx.timing = chunks.enumerated().compactMap { i, chunk in
@@ -719,7 +742,7 @@ extension AppStore {
         guard r.cyclesCompleted > 0 else { coachLog("insight: cyclesCompleted=0 — gated until first loop closes"); return }
         guard UserDefaults.standard.integer(forKey: "coach.retry.cycle-\(r.cyclesCompleted)") < 2 else { coachLog("insight: retry cap for cycle-\(r.cyclesCompleted)"); return }
         coachGenerate(kind: "cycleInsight", key: "cycle-\(r.cyclesCompleted)",
-                      hint: "Debrief the closed cycle against the one before it using cycles[], history[] and workouts[]: what worked, what regressed, which workout or lift is the weak point, and the one concrete change for the next cycle. Max 3 numbers, interpret the rest in words. No chips.",
+                      hint: "Debrief the closed cycle against the one before it using cycles[], history[] and workouts[], comparing slot to slot (and slots[] where it is present): what worked, what regressed, which workout or lift is the weak point, and the one concrete change for the next cycle. Max 3 numbers, interpret the rest in words. No chips.",
                       ctx: cycleInsightContext())
     }
     func coachReconcile() {

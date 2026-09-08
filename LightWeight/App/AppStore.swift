@@ -169,11 +169,74 @@ import Observation
         updateLiveActivity(liveSession())
     }
     /// One active routine, ever: fetch-or-create, append, tick. (View-side creation raced and spawned duplicates.)
+    /// A routine is an ordered list of SLOTS, so a workout already in the loop simply takes another
+    /// one — push · pull · legs · push is a loop of four slots over three workouts, not a mistake.
     func addToRoutine(_ w: Workout) {
         let r = activeRoutine() ?? { let n = Routine(name: "My routine", isActive: true); context.insert(n); return n }()
-        guard !r.orderedEntries.contains(where: { $0.workoutID == w.id }) else { return }
         let e = RoutineEntry(order: r.orderedEntries.count, workoutID: w.id); e.routine = r; context.insert(e)
         try? context.save(); dataTick += 1
+    }
+
+    // MARK: slots
+    /// One place in the loop. `occurrence` and `fills` are what separate two slots holding the
+    /// same workout wherever both are on screen; with every workout in one slot they say nothing.
+    struct Slot: Identifiable {
+        let id: PersistentIdentifier
+        let index: Int                 // 0-based place in the loop
+        let entry: RoutineEntry
+        let workoutID: UUID
+        let name: String
+        let occurrence: Int            // 1-based among the slots this workout fills
+        let fills: [Int]               // every slot index this workout fills
+        var repeated: Bool { fills.count > 1 }
+        /// The other slots this workout fills, 1-based — the editor's "also 2, 5".
+        var alsoFills: [Int] { fills.filter { $0 != index }.map { $0 + 1 } }
+    }
+    /// The active routine as slots. Occurrences are grouped by workout id, numbered in slot order.
+    func routineSlots() -> [Slot] {
+        guard let r = activeRoutine() else { return [] }
+        let entries = r.orderedEntries
+        var fills: [UUID: [Int]] = [:]
+        for (i, e) in entries.enumerated() { fills[e.workoutID, default: []].append(i) }
+        let names = Dictionary(workouts().map { ($0.id, $0.name) }, uniquingKeysWith: { a, _ in a })
+        return entries.enumerated().map { i, e in
+            let all = fills[e.workoutID] ?? [i]
+            return Slot(id: e.persistentModelID, index: i, entry: e, workoutID: e.workoutID,
+                        name: names[e.workoutID] ?? "—", occurrence: (all.firstIndex(of: i) ?? 0) + 1, fills: all)
+        }
+    }
+    /// True only when some workout fills more than one slot — every repeat affordance hangs off this.
+    func routineHasRepeats() -> Bool {
+        let ids = (activeRoutine()?.entries ?? []).map(\.workoutID)
+        return Set(ids).count < ids.count
+    }
+    /// Reorder slots. The pointer follows its OWN slot by identity: matching on workout id would
+    /// land on the first slot a repeated workout fills and silently move the place in the cycle.
+    func moveSlot(from: Int, to: Int) {
+        guard let r = activeRoutine() else { return }
+        var es = r.orderedEntries
+        guard es.indices.contains(from), es.indices.contains(to) else { return }
+        let pointed = es.indices.contains(r.pointer) ? es[r.pointer] : nil
+        let e = es.remove(at: from); es.insert(e, at: to)
+        for (i, x) in es.enumerated() { x.order = i }
+        if let pointed, let i = es.firstIndex(where: { $0 === pointed }) { r.pointer = i }
+        try? context.save(); dataTick += 1
+    }
+    /// Drop one slot. The workout survives — even its last slot is only a place in the loop.
+    /// The pointer keeps its slot; when that slot is the one removed it takes whatever now stands
+    /// at the same index, or wraps to the first. A routine never empties: one slot is the floor.
+    @discardableResult func removeSlot(_ e: RoutineEntry) -> Bool {
+        guard let r = activeRoutine(), r.entries.count > 1 else { return false }
+        let es = r.orderedEntries
+        guard let i = es.firstIndex(where: { $0 === e }) else { return false }
+        let pointed = es.indices.contains(r.pointer) ? es[r.pointer] : nil
+        context.delete(e)
+        let left = es.filter { $0 !== e }
+        for (j, x) in left.enumerated() { x.order = j }
+        if let pointed, pointed !== e, let j = left.firstIndex(where: { $0 === pointed }) { r.pointer = j }
+        else { r.pointer = i < left.count ? i : 0 }
+        try? context.save(); dataTick += 1
+        return true
     }
     func togglePin(_ workoutID: UUID) {
         let id = workoutID.uuidString
@@ -235,19 +298,34 @@ import Observation
         guard let r = activeRoutine(), !r.entries.isEmpty else { return nil }
         return (r.pointer, r.orderedEntries.count, r.cyclesCompleted + 1)
     }
-    /// The most recently trained loop workout's e1RM index against its own previous
-    /// outing. Each workout recurs once per loop, so consecutive sessions of one
-    /// workout ARE a cycle apart — this is the login screen's proof the loop works.
+    /// The most recently trained slot's e1RM index against the SAME SLOT one cycle ago —
+    /// the login screen's proof the loop works. Where a workout fills one slot its two most
+    /// recent sessions are a cycle apart, so the plain per-workout walk is that comparison;
+    /// where it fills two, they are days apart, and only slot-to-slot is a cycle.
     func cycleProof() -> (pct: Double, workout: String)? {
         guard let r = activeRoutine() else { return nil }
         var best: (date: Date, pct: Double, name: String)?
-        for id in r.orderedEntries.map(\.workoutID) {
-            let rs = analysis.sessionsPerGroup[id.uuidString] ?? []
-            guard rs.count >= 2, let last = rs.last, let prev = rs.dropLast().last,
-                  let li = last.index, let pi = prev.index, pi > 0,
-                  let name = workout(id)?.name else { continue }
+        func consider(_ last: SessionResult, _ prev: SessionResult, _ name: String) {
+            guard let li = last.index, let pi = prev.index, pi > 0 else { return }
             let row = (last.date, (li - pi) / pi * 100, name)
             if best == nil || row.0 > best!.date { best = row }
+        }
+        if routineHasRepeats() {
+            let c = cycleChunks()
+            var bySlot: [Int: [Session]] = [:]
+            for chunk in c.past + [c.current] { for (i, s) in chunk.enumerated() { bySlot[i, default: []].append(s) } }
+            for ss in bySlot.values where ss.count >= 2 {
+                guard let last = analysis.results[ss[ss.count - 1].id], let prev = analysis.results[ss[ss.count - 2].id],
+                      let name = workout(ss[ss.count - 1].workoutID)?.name else { continue }
+                consider(last, prev, name)
+            }
+        } else {
+            for id in r.orderedEntries.map(\.workoutID) {
+                let rs = analysis.sessionsPerGroup[id.uuidString] ?? []
+                guard rs.count >= 2, let last = rs.last, let prev = rs.dropLast().last,
+                      let name = workout(id)?.name else { continue }
+                consider(last, prev, name)
+            }
         }
         return best.map { ($0.pct, $0.name) }
     }
@@ -386,7 +464,11 @@ import Observation
         for (i, se) in s.orderedExercises.enumerated() { se.order = i }
         if let wid = s.workoutID, let r = activeRoutine() {
             let ids = r.orderedEntries.map(\.workoutID)
-            if let i = ids.firstIndex(of: wid) {
+            // The slot just trained is the one the pointer stands on. Searching by workout would
+            // land on the FIRST slot a repeated workout fills and rewind the loop; the search is
+            // only the fallback for a session started out of turn.
+            let onPointer = ids.indices.contains(r.pointer) && ids[r.pointer] == wid
+            if let i = onPointer ? r.pointer : ids.firstIndex(of: wid) {
                 if i + 1 >= ids.count { r.cyclesCompleted += 1 }
                 r.pointer = (i + 1) % ids.count
             }
@@ -510,18 +592,24 @@ import Observation
                 try? context.save()
             }
         }
-        if args.contains("--build-demo-routine"), activeRoutine() == nil {
-            reload()
-            for n in ["Legs", "Shoulders and biceps", "Back", "Push 1"] {
-                if let w = workouts().first(where: { $0.name == n }) { addToRoutine(w) }
-            }
-            if let r = activeRoutine() { r.name = "Hevy split"; r.pointer = 1; r.cyclesCompleted = 92; try? context.save() }
-            reload()
-        }
+        if args.contains("--build-demo-routine") { buildDemoLoop(["Legs", "Shoulders and biceps", "Back", "Push 1"], name: "Hevy split", pointer: 1) }
+        // A loop with a workout in two slots, for the repeat frames — slot 4 is push's second turn.
+        if args.contains("--demo-repeats") { buildDemoLoop(["Push 1", "Pull", "Legs", "Push 1", "Pull", "Shoulders"], name: "PPL × 2", pointer: 3) }
         if let i = args.firstIndex(of: "--today"), i + 1 < args.count {
             let f = ISO8601DateFormatter(); f.formatOptions = [.withFullDate]; today = f.date(from: args[i + 1]) ?? .now
         }
         #endif
+    }
+
+    /// Dev: a named loop over existing workouts, rebuilt from scratch so a relaunch is deterministic.
+    /// A name repeated in `names` is a repeated SLOT, which is the point.
+    private func buildDemoLoop(_ names: [String], name: String, pointer: Int) {
+        reload()
+        for r in ((try? context.fetch(FetchDescriptor<Routine>())) ?? []) { context.delete(r) }
+        try? context.save()
+        for n in names { if let w = workouts().first(where: { $0.name == n }) { addToRoutine(w) } }
+        if let r = activeRoutine() { r.name = name; r.pointer = pointer; r.cyclesCompleted = 92; try? context.save() }
+        reload()
     }
 }
 
