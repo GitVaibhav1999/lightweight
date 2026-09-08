@@ -28,6 +28,10 @@ import SwiftData
         for p in parsed {
             if existingKeys.contains(p.key) { report.skipped += 1; continue }
             let s = Session(title: p.title, workoutID: nil, startedAt: p.start, source: "hevy")
+            // Identity comes from the export, not from chance. A random UUID makes the same
+            // session a different row after a reinstall, which the server rejects: hevy_key is
+            // unique per user, so a re-imported push collides with what is already there.
+            s.id = Self.stableID(p.key)
             s.endedAt = p.end; s.isDraft = false; s.hevyKey = p.key; s.note = p.notes
             context.insert(s)
             for (i, ex) in p.exercises.enumerated() {
@@ -49,6 +53,21 @@ import SwiftData
         if report.imported > 0 { reconstruct(context: context, report: &report) }
         try context.save()
         return report
+    }
+
+    /// Deterministic UUID from the Hevy key, so the same export yields the same ids on any
+    /// device and a re-import is genuinely idempotent rather than merely deduplicated locally.
+    static func stableID(_ key: String) -> UUID {
+        var h1: UInt64 = 0xcbf29ce484222325, h2: UInt64 = 0x9e3779b97f4a7c15
+        for b in key.utf8 {
+            h1 = (h1 ^ UInt64(b)) &* 0x100000001b3
+            h2 = (h2 &+ UInt64(b)) &* 0xff51afd7ed558ccd
+            h2 ^= h2 >> 33
+        }
+        let hex = String(format: "%016lx%016lx", h1, h2)
+        let c = Array(hex)
+        let str = "\(String(c[0..<8]))-\(String(c[8..<12]))-\(String(c[12..<16]))-\(String(c[16..<20]))-\(String(c[20..<32]))"
+        return UUID(uuidString: str) ?? UUID()
     }
 
     /// Titles used ≥3× become Workouts (slots from the last 6 sessions); those used ≥3× in the last 120 days form the routine loop.

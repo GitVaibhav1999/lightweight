@@ -85,6 +85,24 @@ final class HevyImportFidelityTests: XCTestCase {
                        "a title that recurs twice a week rebuilds as one workout with two turns, not two workouts")
     }
 
+    /// The identity a Hevy session gets must survive a wipe, or a re-imported push collides
+    /// with rows the server already holds under their old ids (hevy_key is unique per user).
+    func testSessionIDIsStableAcrossAWipe() throws {
+        let csv = """
+        "title","start_time","end_time","description","exercise_title","superset_id","exercise_notes","set_index","set_type","weight_kg","reps","distance_km","duration_seconds","rpe"
+        "Legs","1 Apr 2023, 20:34","1 Apr 2023, 21:30","","Squat (Barbell)","","",0,"normal",100,5,,,
+        """
+        func idAfterFreshImport() throws -> UUID {
+            let store = AppStore(inMemory: true)          // a brand new store, as after a reinstall
+            _ = try HevyImporter.importCSV(csv, into: store.context)
+            let all = ((try? store.context.fetch(FetchDescriptor<Session>())) ?? [])
+            return try XCTUnwrap(all.first { $0.hevyKey == "Legs|1 Apr 2023, 20:34" }).id
+        }
+        XCTAssertEqual(try idAfterFreshImport(), try idAfterFreshImport(),
+                       "the same export must yield the same id on any device")
+        XCTAssertEqual(HevyImporter.stableID("Legs|1 Apr 2023, 20:34"), try idAfterFreshImport())
+    }
+
     /// Re-import is a no-op, so the notes are not duplicated or wiped on a second run.
     func testReimportIsIdempotent() throws {
         let csv = """
