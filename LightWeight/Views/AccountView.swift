@@ -10,6 +10,8 @@ struct AccountView: View {
     @AppStorage("appearance.mode") private var appearanceMode = "system"
     @State private var confirmSignOut = false
     @State private var picking = false
+    @State private var syncing = false
+    @State private var syncNote: String?
     @State private var lastImport = UserDefaults.standard.object(forKey: "hevy.lastImport") as? Date
     @State private var dragX: CGFloat = 0
 
@@ -115,7 +117,36 @@ struct AccountView: View {
         .accessibilityElement(children: .contain)
     }
 
+    /// Debug only. Sync is push-only and unfinished; shipping a half-duplex sync button to
+    /// users would imply their data is safe on the server, which it is not yet.
+    @ViewBuilder private var syncRow: some View {
+        #if DEBUG
+        Button {
+            syncing = true
+            Task {
+                do { let r = try await Sync.pushAll(store); syncNote = r.summary }
+                catch { syncNote = error.localizedDescription }
+                syncing = false
+            }
+        } label: {
+            HStack(spacing: 10) {
+                Text("Push to Postgres").font(LWFont.body(14)).foregroundStyle(LW.ink)
+                Spacer(minLength: 8)
+                Text(syncing ? "pushing…" : (syncNote ?? "debug"))
+                    .font(LWFont.mono(10)).foregroundStyle(LW.ink(0.58)).lineLimit(1)
+                Icon(kind: .chevronRight, size: 14, color: LW.ink(0.4), weight: 1.8)
+            }
+            .frame(height: 48).contentShape(Rectangle())
+        }
+        .buttonStyle(.plain).disabled(syncing)
+        .overlay(alignment: .bottom) { Hairline() }
+        .accessibilityIdentifier("account.sync").accessibilityLabel("Push to Postgres")
+        #endif
+    }
+
     private var dataRows: some View {
+        VStack(spacing: 0) {
+        syncRow
         Button { picking = true } label: {
             HStack(spacing: 10) {
                 Text("Import from Hevy").font(LWFont.body(14)).foregroundStyle(LW.ink)
@@ -136,6 +167,7 @@ struct AccountView: View {
             store.importHevy(text: text)
             lastImport = .now
             UserDefaults.standard.set(lastImport, forKey: "hevy.lastImport")
+        }
         }
     }
 

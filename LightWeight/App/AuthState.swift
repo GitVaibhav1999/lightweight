@@ -31,6 +31,21 @@ import Supabase
             phase = (offline || args.contains("--signed-out")) ? .signedOut : Self.mockAccount
             return
         }
+        // Debug only. The simulator points at the local stack, where the only sign-in the UI
+        // offers (Apple, Google) cannot complete — so testing anything that needs a real
+        // auth.uid(), like a sync push, needs a password path that does not exist in the app.
+        #if DEBUG
+        if let i = args.firstIndex(of: "--dev-signin"), i + 2 < args.count {
+            let email = args[i + 1], password = args[i + 2]
+            Task {
+                do {
+                    let session = try await Supa.client.auth.signIn(email: email, password: password)
+                    phase = Self.signedIn(from: session.user)
+                } catch { phase = .signedOut }
+            }
+            return
+        }
+        #endif
         Task { await restore() }
     }
 
