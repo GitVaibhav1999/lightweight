@@ -4,15 +4,18 @@ const d=await remote({hostname:'127.0.0.1',port:4723,path:'/',logLevel:'error',c
  'appium:bundleId':'com.vaibhavgautam.lightweight','appium:noReset':true,
  'appium:newCommandTimeout':300,'appium:wdaLaunchTimeout':300000,'appium:waitForQuiescence':false}});
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const tap = async (sel, t=12000) => { const e=d.$(`~${sel}`); await e.waitForExist({timeout:t}); await e.click(); };
 await d.execute('mobile: terminateApp',{bundleId:'com.vaibhavgautam.lightweight'}).catch(()=>{});
 await sleep(800);
 await d.execute('mobile: launchApp',{bundleId:'com.vaibhavgautam.lightweight',
   arguments:['--today','2025-09-10','--dev-signin','dev@lightweight.local','devpassword123']});
 await sleep(9000);
-await d.$('~nav.tab.workouts').click(); await sleep(1800);
-const r = d.$('-ios predicate string:label CONTAINS[c] "New workout"');
-if (await r.isExisting()) { await r.click(); await sleep(2000); }
-const s = await d.getPageSource();
-const ids = [...s.matchAll(/name="([a-z0-9._]+)"/gi)].map(m=>m[1]);
-console.log('  identifiers on the edit screen:', [...new Set(ids)].slice(0,18).join(', '));
+
+// 1. create a workout
+await tap('nav.tab.workouts'); await sleep(1500);
+const src = await d.getPageSource();
+if (/New workout/.test(src)) console.log('  (a workout already exists)');
+const newBtn = d.$('-ios predicate string:label CONTAINS "New workout"');
+if (await newBtn.isExisting()) { await newBtn.click(); console.log('STEP 1: created a workout'); await sleep(2500); }
+await d.saveScreenshot('./verify/sync-1.png');
 await d.deleteSession();

@@ -4,15 +4,23 @@ const d=await remote({hostname:'127.0.0.1',port:4723,path:'/',logLevel:'error',c
  'appium:bundleId':'com.vaibhavgautam.lightweight','appium:noReset':true,
  'appium:newCommandTimeout':300,'appium:wdaLaunchTimeout':300000,'appium:waitForQuiescence':false}});
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const byLabel = s => d.$(`-ios predicate string:label CONTAINS[c] "${s}"`);
 await d.execute('mobile: terminateApp',{bundleId:'com.vaibhavgautam.lightweight'}).catch(()=>{});
 await sleep(800);
 await d.execute('mobile: launchApp',{bundleId:'com.vaibhavgautam.lightweight',
   arguments:['--today','2025-09-10','--dev-signin','dev@lightweight.local','devpassword123']});
 await sleep(9000);
 await d.$('~nav.tab.workouts').click(); await sleep(1800);
-const r = d.$('-ios predicate string:label CONTAINS[c] "New workout"');
-if (await r.isExisting()) { await r.click(); await sleep(2000); }
-const s = await d.getPageSource();
-const ids = [...s.matchAll(/name="([a-z0-9._]+)"/gi)].map(m=>m[1]);
-console.log('  identifiers on the edit screen:', [...new Set(ids)].slice(0,18).join(', '));
+
+// open the workout -> add an exercise (creates a slot)
+const row = byLabel('New workout');
+if (await row.isExisting()) { await row.click(); await sleep(1800); console.log('opened the workout'); }
+const add = byLabel('Add exercise');
+if (await add.isExisting()) {
+  await add.click(); await sleep(2200);
+  const first = d.$('-ios class chain:**/XCUIElementTypeButton[`label CONTAINS "Press"`][1]');
+  if (await first.isExisting()) { await first.click(); console.log('STEP 2: added an exercise'); await sleep(2500); }
+  else { const any = await d.$$('XCUIElementTypeButton'); if (any.length>6) { await any[6].click(); console.log('STEP 2: added an exercise (fallback)'); await sleep(2500); } }
+}
+await d.saveScreenshot('./verify/sync-2.png');
 await d.deleteSession();

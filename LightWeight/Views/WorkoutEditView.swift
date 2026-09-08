@@ -85,7 +85,7 @@ struct WorkoutEditView: View {
         VStack(spacing: 12) {
             Capsule().fill(LW.ink(0.3)).frame(width: 36, height: 4)
             HStack { Text(s.exerciseName).font(LWFont.body(15, weight: 700)); Spacer()
-                Button { store.context.delete(s); reindex(w); selected = nil } label: { Text("Remove").font(LWFont.body(12)).foregroundStyle(LW.ink(0.5)) }.buttonStyle(.plain) }
+                Button { store.context.delete(s); reindex(w); selected = nil; store.workoutEdited(w) } label: { Text("Remove").font(LWFont.body(12)).foregroundStyle(LW.ink(0.5)) }.buttonStyle(.plain) }
             HStack(spacing: 10) {
                 stepper("Sets", "\(s.sets)") { s.sets = max(1, s.sets - 1) } plus: { s.sets = min(10, s.sets + 1) }
                 stepper("Rep range", "\(s.repLo)–\(s.repHi)") { s.repLo = max(1, s.repLo - 1); s.repHi = max(s.repLo, s.repHi - 1) } plus: { s.repLo += 1; s.repHi += 1 }
@@ -103,14 +103,14 @@ struct WorkoutEditView: View {
         VStack(alignment: .leading, spacing: 5) {
             Text(label).lwLabel(9.5, tracking: 0.12, color: LW.ink(0.35))
             HStack {
-                Button(action: { minus(); try? store.context.save() }) { Text("−").foregroundStyle(LW.ink(0.5)).frame(width: 26, height: 26).background(Circle().fill(LW.ink(0.08))) }.buttonStyle(.plain)
+                Button(action: { minus(); if let w = store.workout(workoutID) { store.workoutEdited(w) } }) { Text("−").foregroundStyle(LW.ink(0.5)).frame(width: 26, height: 26).background(Circle().fill(LW.ink(0.08))) }.buttonStyle(.plain)
                 Spacer(); Text(value).font(LWFont.mono(13)); Spacer()
-                Button(action: { plus(); try? store.context.save() }) { Text("+").foregroundStyle(LW.accent).frame(width: 26, height: 26).background(Circle().fill(LW.accent(0.15))) }.buttonStyle(.plain)
+                Button(action: { plus(); if let w = store.workout(workoutID) { store.workoutEdited(w) } }) { Text("+").foregroundStyle(LW.accent).frame(width: 26, height: 26).background(Circle().fill(LW.accent(0.15))) }.buttonStyle(.plain)
             }.padding(.horizontal, 5).frame(height: 36).background(RoundedRectangle(cornerRadius: 9).fill(LW.ink(0.1)))
         }.frame(maxWidth: .infinity)
     }
     private func reindex(_ w: Workout) { for (i, s) in w.orderedSlots.enumerated() { s.order = i } }
-    private func save() { try? store.context.save() }
+    private func save() { if let w = store.workout(workoutID) { store.workoutEdited(w) } }
     private func medianMinutes(_ w: Workout) -> Int {
         let m = store.finishedSessions().filter { $0.workoutID == w.id }.map(\.durationMinutes).sorted()
         return m.isEmpty ? max(10, w.slots.reduce(0) { $0 + $1.sets } * 3) : m[m.count / 2]

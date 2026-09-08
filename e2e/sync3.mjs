@@ -12,7 +12,14 @@ await sleep(9000);
 await d.$('~nav.tab.workouts').click(); await sleep(1800);
 const r = d.$('-ios predicate string:label CONTAINS[c] "New workout"');
 if (await r.isExisting()) { await r.click(); await sleep(2000); }
-const s = await d.getPageSource();
-const ids = [...s.matchAll(/name="([a-z0-9._]+)"/gi)].map(m=>m[1]);
-console.log('  identifiers on the edit screen:', [...new Set(ids)].slice(0,18).join(', '));
+const empty = d.$('~empty.workouts.slots');
+if (await empty.isExisting()) { await empty.click(); await sleep(2500); console.log('opened the exercise picker'); }
+const btns = await d.$$('XCUIElementTypeButton');
+console.log('  buttons in picker:', btns.length);
+for (const b of btns.slice(0, 30)) {
+  const l = await b.getAttribute('label').catch(()=>'');
+  if (l && /press|squat|curl|row|raise|fly|pulldown/i.test(l)) { await b.click(); console.log('  picked:', l.slice(0,40)); break; }
+}
+await sleep(3000);
+await d.saveScreenshot('./verify/sync-3.png');
 await d.deleteSession();

@@ -63,10 +63,10 @@ struct WorkoutsView: View {
                             // the nav's + is gone, so the start sheet (and its empty session) lives here now
                             Button { router.startSheet = true } label: { Text("Empty session").font(LWFont.mono(11)).foregroundStyle(LW.ink(0.5)) }
                                 .buttonStyle(.plain).accessibilityIdentifier("workouts.empty.session")
-                            Button { let w = Workout(name: "New workout"); store.context.insert(w); try? store.context.save(); store.dataTick += 1; router.push(.workoutEdit(w.id)) } label: { Text("+ New workout").font(LWFont.mono(11)).foregroundStyle(LW.accent) }.buttonStyle(.plain)
+                            Button { let w = store.newWorkout(); router.push(.workoutEdit(w.id)) } label: { Text("+ New workout").font(LWFont.mono(11)).foregroundStyle(LW.accent) }.buttonStyle(.plain)
                         }.padding(.top, 22)
                         if all.isEmpty {
-                            EmptyWorkoutsCard { let w = Workout(name: "New workout"); store.context.insert(w); try? store.context.save(); store.dataTick += 1; router.push(.workoutEdit(w.id)) }
+                            EmptyWorkoutsCard { let w = store.newWorkout(); router.push(.workoutEdit(w.id)) }
                         }
                         VStack(spacing: 0) {
                             ForEach(all, id: \.0.id) { w, n in
@@ -88,7 +88,7 @@ struct WorkoutsView: View {
                                                 .foregroundStyle(store.isPinned(w.id) ? LW.accent : LW.ink(0.35))
                                                 .frame(width: 28, height: 28).contentShape(Rectangle())
                                         }.buttonStyle(.plain).accessibilityIdentifier("pin.\(w.name)").accessibilityValue(store.isPinned(w.id) ? "pinned" : "unpinned")
-                                        Button { withAnimation(.easeOut(duration: 0.18)) { pendingDelete = pendingDelete == w.id ? nil : w.id } } label: { Icon(kind: .trash, size: 14, color: pendingDelete == w.id ? LW.ink(0.7) : LW.ink(0.35), weight: 1.7).frame(width: 28, height: 28).contentShape(Rectangle()) }.buttonStyle(.plain).accessibilityIdentifier("delete.\(w.name)")
+                                        DeleteAffordance(workout: w, pending: $pendingDelete)
                                         if pendingDelete == w.id {
                                             Button { withAnimation(.easeOut(duration: 0.15)) { delete(w, routine); pendingDelete = nil } } label: {
                                                 Text("Delete").font(LWFont.body(13, weight: 700)).foregroundStyle(.white)
@@ -159,5 +159,31 @@ struct SlotPickerSheet: View {
         .presentationDragIndicator(.visible)
         .presentationBackground(LW.bg)
         .accessibilityElement(children: .contain).accessibilityIdentifier("slot.picker")
+    }
+}
+
+/// A workout the loop uses cannot be deleted: taking it out is a routine edit, not a workout
+/// one. Its own view so the row's body stays inside what the type-checker will solve.
+private struct DeleteAffordance: View {
+    @Environment(AppStore.self) private var store
+    let workout: Workout
+    @Binding var pending: UUID?
+    var body: some View {
+        if store.routineUses(workout) {
+            Text("in loop")
+                .font(LWFont.mono(8.5)).tracking(0.6).foregroundStyle(LW.ink(0.22))
+                .frame(height: 28)
+                .accessibilityIdentifier("delete.locked")
+                .accessibilityLabel("In the routine — remove the slot first")
+        } else {
+            Button {
+                withAnimation(.easeOut(duration: 0.18)) { pending = pending == workout.id ? nil : workout.id }
+            } label: {
+                Icon(kind: .trash, size: 14, color: pending == workout.id ? LW.ink(0.7) : LW.ink(0.35), weight: 1.7)
+                    .frame(width: 28, height: 28).contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("delete.\(workout.name)")
+        }
     }
 }

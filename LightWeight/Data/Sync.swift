@@ -91,6 +91,59 @@ import Supabase
         return r
     }
 
+    // ── targeted pushes ──────────────────────────────────────────────────────
+    // Write-through: a mutation sends only what it touched. Pushing everything on every
+    // edit would mean 6,000 set logs for one renamed workout. Fire-and-forget — a failed
+    // push must never block the UI, and the next full push reconciles.
+
+    private static func uid() async -> String? {
+        (try? await Supa.client.auth.session.user.id.uuidString.lowercased())
+    }
+    private static func put(_ table: String, _ rows: [some Encodable & Sendable]) async throws {
+        guard !rows.isEmpty else { return }
+        _ = try await Supa.client.from(table).upsert(rows, onConflict: "id", returning: .minimal).execute()
+    }
+
+    /// A workout and the slots that belong to it. Slots are replaced wholesale because
+    /// their ids derive from position: reordering changes which id holds which exercise.
+    static func pushWorkout(_ w: Workout) async {
+        guard let uid = await uid() else { return }
+        do {
+            try await put("workouts", [WorkoutRow(w, uid)])
+            try await put("workout_slots", w.orderedSlots.map { SlotRow($0, w, uid) })
+        } catch { coachLog("sync workout \(w.name): \(error)") }
+    }
+
+    static func pushRoutine(_ r: Routine) async {
+        guard let uid = await uid() else { return }
+        do {
+            try await put("routines", [RoutineRow(r, uid)])
+            try await put("routine_entries", r.orderedEntries.map { EntryRow($0, r, uid) })
+        } catch { coachLog("sync routine: \(error)") }
+    }
+
+    /// A finished session with everything under it. Called once at finish rather than per
+    /// set — a live session would otherwise push on every rep.
+    static func pushSession(_ s: Session) async {
+        guard let uid = await uid() else { return }
+        do {
+            try await put("sessions", [SessionRow(s, uid)])
+            try await put("session_exercises", s.orderedExercises.map { SessionExerciseRow($0, s, uid) })
+            try await put("set_logs", s.orderedExercises.flatMap { se in se.orderedSets.map { SetRow($0, se, uid) } })
+        } catch { coachLog("sync session \(s.title): \(error)") }
+    }
+
+    /// Deletes are soft, so the row stays and carries a tombstone the next device reads.
+    static func softDelete(_ table: String, id: UUID) async {
+        guard await uid() != nil else { return }
+        struct Tomb: Encodable, Sendable { let deleted_at: String }
+        do {
+            _ = try await Supa.client.from(table)
+                .update(Tomb(deleted_at: iso.string(from: Date())))
+                .eq("id", value: id.uuidString.lowercased()).execute()
+        } catch { coachLog("sync delete \(table): \(error)") }
+    }
+
     // ── row shapes ───────────────────────────────────────────────────────────
     // Written by hand rather than derived, because the column names are the contract
     // (see supabase/SCHEMA.md): `order`/`index` become `position`, `type` becomes `kind`,

@@ -107,11 +107,13 @@ struct ExercisePickerView: View {
         case .workout(let id):
             guard let w = store.workout(id) else { return }
             let s = WorkoutSlot(order: w.slots.count, exerciseID: e.id, exerciseName: e.name, sets: 3, repLo: 8, repHi: 12); s.workout = w; store.context.insert(s)
+            store.workoutEdited(w)                 // a template change the server should hold
         case .session(let id):
             guard let s = store.session(id) else { return }
             store.addExercise(to: s, exerciseID: e.id, name: e.name)
+            // a live session pushes once at finish, not per exercise
         }
-        try? store.context.save(); router.pop()
+        router.pop()
     }
     private func create(bodyweight: Bool) {
         let name = customName.trimmingCharacters(in: .whitespaces); guard !name.isEmpty else { return }

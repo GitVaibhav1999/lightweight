@@ -191,6 +191,7 @@ import Observation
         let r = activeRoutine() ?? { let n = Routine(name: "My routine", isActive: true); context.insert(n); return n }()
         let e = RoutineEntry(order: r.orderedEntries.count, workoutID: w.id); e.routine = r; context.insert(e)
         try? context.save(); dataTick += 1
+        syncRoutine()
     }
 
     // MARK: slots
@@ -237,6 +238,7 @@ import Observation
         for (i, x) in es.enumerated() { x.order = i }
         if let pointed, let i = es.firstIndex(where: { $0 === pointed }) { r.pointer = i }
         try? context.save(); dataTick += 1
+        syncRoutine()
     }
     /// Drop one slot. The workout survives — even its last slot is only a place in the loop.
     /// The pointer keeps its slot; when that slot is the one removed it takes whatever now stands
@@ -300,11 +302,45 @@ import Observation
                             lastVolume: last?.volume ?? 0, bestVolume: rs.map(\.volume).max() ?? 0,
                             lastIndex: last?.index, bestIndex: rs.compactMap(\.index).max(), lastDate: last?.date)
     }
+    /// Creating a workout was inline in two views, which is why neither reached the server.
+    func newWorkout(name: String = "New workout") -> Workout {
+        let w = Workout(name: name)
+        context.insert(w); try? context.save(); dataTick += 1
+        syncWorkout(w)
+        return w
+    }
+
+    /// Anything that edits a workout's slots: add, remove, reorder, rename.
+    func workoutEdited(_ w: Workout) { try? context.save(); dataTick += 1; syncWorkout(w) }
+
+    // MARK: write-through sync
+    /// Every mutation that changes something the server holds calls one of these. Detached
+    /// and ignored on failure: a sync problem must never block a set being logged, and a
+    /// full push reconciles whatever a dropped call missed.
+    func syncWorkout(_ w: Workout) { Task { await Sync.pushWorkout(w) } }
+    func syncRoutine() { if let r = activeRoutine() { Task { await Sync.pushRoutine(r) } } }
+    func syncSession(_ s: Session) { Task { await Sync.pushSession(s) } }
+    func syncDelete(_ table: String, _ id: UUID) { Task { await Sync.softDelete(table, id: id) } }
+
     /// Deleting a workout that sits in the loop has to repair the loop, not just drop the
     /// rows: close the gap left in `order`, and park the pointer. A pointer left aiming at a
     /// position that no longer exists makes nextWorkout() serve the wrong workout silently,
     /// and routineProgress() report a place in the cycle that cannot be reached.
-    func deleteWorkout(_ w: Workout) {
+    /// A workout the loop points at cannot be deleted out from under it. Repairing the
+    /// routine silently is worse than refusing: the loop is the thing the user built, and
+    /// removing a slot is a deliberate act that belongs on the routine, not on the workout.
+    func routineUses(_ w: Workout) -> Bool {
+        (activeRoutine()?.orderedEntries ?? []).contains { $0.workoutID == w.id }
+    }
+
+    @discardableResult
+    func deleteWorkout(_ w: Workout) -> Bool {
+        guard !routineUses(w) else { return false }
+        deleteWorkoutUnchecked(w)
+        return true
+    }
+
+    private func deleteWorkoutUnchecked(_ w: Workout) {
         let r = activeRoutine()
         // SwiftData keeps deleted objects in the relationship until save, so the survivors
         // have to be identified by reference rather than re-read from r.entries.
@@ -319,6 +355,8 @@ import Observation
             r.pointer = 0
         }
         try? context.save(); dataTick += 1
+        syncDelete("workouts", w.id)
+        syncRoutine()
     }
 
     /// (sessions done in the current cycle, loop length, 1-based cycle number)
@@ -503,6 +541,8 @@ import Observation
         }
         try? context.save()
         settling = true                                // the summary can open now; the engine catches up behind it
+        syncSession(s)
+        syncRoutine()          // the pointer moved with it
     }
     /// The expensive tail of finishing: Engine.run over every session, then the widget snapshot.
     /// Deliberately NOT part of `finish` — it used to hold the session screen on screen while it ran.
@@ -521,11 +561,13 @@ import Observation
 
     /// Remove a finished session from history: verdicts, PRs, graphs and the widget all re-derive.
     func deleteSession(_ s: Session) {
+        let id = s.id
         if liveSessionID == s.id { liveSessionID = nil; endLiveActivity() }
         context.delete(s)
         try? context.save()
         reload()
         if !usedFallbackStore { pushWidgetSnapshot() }
+        syncDelete("sessions", id)
     }
 
     func discard(_ s: Session) { cancelRest(); if liveSessionID == s.id { liveSessionID = nil; endLiveActivity() }; context.delete(s); try? context.save() }
