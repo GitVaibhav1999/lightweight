@@ -9,7 +9,8 @@ const CSV  = new URL('../.cache/hevy/workout_data.csv', import.meta.url).pathnam
 const OUT  = new URL('./verify/', import.meta.url).pathname;
 fs.mkdirSync(OUT, { recursive: true });
 
-const BASE = ['--today', '2026-08-27', '--mock-auth', '--hevy-csv', CSV];
+// The export ends 9 Sep 2025 — pinning today past it leaves every month view empty.
+const BASE = ['--today', '2025-09-10', '--mock-auth', '--hevy-csv', CSV];
 const driver = await remote({ hostname: '127.0.0.1', port: 4723, path: '/', logLevel: 'error', capabilities: {
   platformName: 'iOS', 'appium:automationName': 'XCUITest', 'appium:udid': UDID,
   'appium:bundleId': 'com.vaibhavgautam.lightweight', 'appium:noReset': true,
@@ -20,6 +21,33 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const shot  = async name => { await driver.saveScreenshot(`${OUT}${name}.png`); };
 const src   = () => driver.getPageSource();
 const has   = async (sel, t = 6000) => { try { await driver.$(`~${sel}`).waitForExist({ timeout: t }); return true; } catch { return false; } };
+/** Existence is not visibility here: pager pages stay in the accessibility tree while
+ *  off-screen, so a click on an "existing" element silently lands nowhere. */
+const onScreen = async (sel, timeout = 8000) => {
+  const el = driver.$(`~${sel}`); await el.waitForExist({ timeout });
+  const win = await driver.getWindowSize(); const t0 = Date.now();
+  for (;;) {
+    const l = await el.getLocation().catch(() => null);
+    const sz = l && await el.getSize().catch(() => null);
+    if (l && sz) { const cx = l.x + sz.width / 2; if (cx >= 0 && cx <= win.width) return el; }
+    if (Date.now() - t0 > timeout) throw new Error(`~${sel} exists but is off-screen`);
+    await sleep(200);
+  }
+};
+/** Scroll the page until the button is both present and vertically in view, then tap it. */
+const tapInList = async (sel, tries = 8) => {
+  for (let i = 0; i < tries; i++) {
+    const el = driver.$(`~${sel}`);
+    if (await el.isExisting().catch(() => false)) {
+      const l = await el.getLocation().catch(() => null);
+      const win = await driver.getWindowSize();
+      if (l && l.y > 90 && l.y < win.height - 110) { await el.click(); return true; }
+    }
+    await driver.execute('mobile: swipe', { direction: 'up' });
+    await sleep(500);
+  }
+  return false;
+};
 
 const results = [];
 const check = (name, pass, detail = '') => {
@@ -41,13 +69,25 @@ const relaunch = async (extra = []) => {
 await relaunch(['--focus', 'off']);
 await shot('01-home-before');
 {
-  await driver.$('~nav.tab.workouts').click(); await sleep(1200);
+  await driver.$('~nav.tab.workouts').click();
+  await onScreen('page.workouts', 8000); await sleep(700);
+  // loop.add.* is rendered only under `if editing` — without this the buttons are
+  // simply not in the tree, which reads identically to "not reachable".
+  const t = driver.$('~workouts.edit');
+  if (!/Done editing/.test(await t.getAttribute('label').catch(() => ''))) { await t.click(); await sleep(600); }
+  const added = [];
   for (const name of ['Legs', 'Push 1', 'Back', 'Shoulders']) {
-    const btn = driver.$(`~loop.add.${name}`);
-    if (await btn.isExisting().catch(() => false)) { await btn.click(); await sleep(450); }
+    if (await tapInList(`loop.add.${name}`)) { added.push(name); await sleep(500); }
   }
+  if (/Done editing/.test(await t.getAttribute('label').catch(() => ''))) { await t.click(); await sleep(400); }
+  // Re-runnable: a workout already in the loop correctly has no add button, so an
+  // existing routine is a pass too — the next check proves the loop actually works.
+  const loopRows = [...(await src()).matchAll(/name="routine.row"/g)].length;
+  check('routine built through the UI', added.length === 4 || loopRows >= 4,
+        added.length ? added.join(' · ') : `${loopRows} already in the loop`);
   await shot('02-routine-built');
-  await driver.$('~nav.tab.home').click(); await sleep(1400);
+  await driver.$('~nav.tab.home').click();
+  await onScreen('routine.hero', 8000).catch(() => {}); await sleep(1200);
   await shot('03-home');
   const s = await src();
   const live = /CYCLE|NEXT UP|IN PROGRESS|DONE/i.test(s) && !/is your workouts, on repeat/i.test(s);
@@ -64,7 +104,8 @@ await sleep(1200); await shot('02-calendar');
   check('calendar header has no "Import from Hevy"', gone,
         gone ? 'settings owns it' : 'link still present');
   const n = (s.match(/(\d+)\s+sessions/i) || [])[1];
-  check('calendar shows the real session count', Number(n) > 100, n ? `${n} sessions in view` : 'no count found');
+  // This counts the month on screen, not the whole history — Sep 2025 is the last month of the export.
+  check('calendar shows real sessions for the month', Number(n) > 0, n ? `${n} in Sep 2025` : 'no count found');
 }
 
 // ── 3. the two-question ask, on a real finished session ─────────────────────
