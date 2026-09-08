@@ -204,7 +204,12 @@ struct AllHistory: View {
                     if i == 0 || !cal.isDate(s.startedAt, equalTo: sessions[i - 1].startedAt, toGranularity: .month) {
                         Text(Fmt.date(s.startedAt, "MMMM yyyy") + " ↓").font(LWFont.mono(10)).foregroundStyle(LW.ink(0.3)).frame(height: 34, alignment: .bottomLeading).padding(.bottom, 4)
                     }
-                    SwipeDeleteRow(onTap: { router.push(.summary(s.id)) }, onDelete: { store.deleteSession(s) }) {
+                    // A plain row. SwipeDeleteRow gave every row a DragGesture, an
+                    // onTapGesture and a Button — hit-testing was the largest single bucket in
+                    // the device trace (6.4%), and the scroll view consults all of them on every
+                    // touch move. Delete moves to a long press, which adds no recogniser that
+                    // competes with panning.
+                    HistoryRow(onTap: { router.push(.summary(s.id)) }, onDelete: { store.deleteSession(s) }) {
                         HStack(spacing: 12) {
                             Text(s.title).font(LWFont.body(13.5)).foregroundStyle(LW.ink).lineLimit(1)
                             if s.edited { Text("EDITED").font(LWFont.mono(8.5)).tracking(0.8).foregroundStyle(LW.ink(0.4)) }
@@ -277,6 +282,23 @@ struct HistorySkeleton: View {
             guard !reduceMotion else { return }
             withAnimation(.easeInOut(duration: 0.85).repeatForever(autoreverses: true)) { dim = true }
         }
+    }
+}
+
+/// Tap opens the summary, long press offers Delete. Deliberately gesture-light: this is
+/// rendered hundreds of times and every recogniser is consulted on each touch move.
+struct HistoryRow<Content: View>: View {
+    var onTap: () -> Void
+    var onDelete: () -> Void
+    @ViewBuilder var content: Content
+    var body: some View {
+        content
+            .contentShape(Rectangle())
+            .onTapGesture(perform: onTap)
+            .contextMenu {
+                Button(role: .destructive) { onDelete() } label: { Label("Delete", systemImage: "trash") }
+            }
+            .accessibilityIdentifier("history.row")
     }
 }
 
