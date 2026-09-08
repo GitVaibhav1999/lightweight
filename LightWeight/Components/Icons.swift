@@ -114,8 +114,13 @@ struct VerdictIcon: View {
     var size: CGFloat = 13
     var body: some View {
         switch verdict {
-        case .best: Icon(kind: .arrowUp, size: size, color: LW.accentBright, weight: 2.6)
-        case .up: Icon(kind: .arrowUp, size: size, color: LW.accent, weight: 2.6)
+        // Accent is earned: only an all-time best glows. A session that merely beat the
+        // last one is an up, not a record — accenting both made every arrow look the same.
+        case .best:
+            Icon(kind: .arrowUp, size: size, color: LW.accentBright, weight: 2.6)
+                .shadow(color: LW.accentBright.opacity(0.75), radius: size * 0.30)
+                .shadow(color: LW.accent.opacity(0.40), radius: size * 0.70)
+        case .up: Icon(kind: .arrowUp, size: size, color: LW.ink(0.7), weight: 2.6)
         case .held: Icon(kind: .held, size: size, color: LW.ink(0.5), weight: 2.6)
         case .down: Icon(kind: .arrowDown, size: size, color: LW.ink(0.45), weight: 2.6)
         case nil: Color.clear.frame(width: size, height: size)

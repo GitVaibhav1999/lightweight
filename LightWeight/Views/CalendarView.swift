@@ -28,7 +28,6 @@ struct CalendarView: View {
                         HStack(alignment: .firstTextBaseline) {
                             Text(Fmt.date(start, "MMMM yyyy").uppercased()).font(LWFont.display(28, width: 88)).tracking(-0.6)
                             Spacer()
-                            Button { importing = true } label: { Text("Import from Hevy").font(LWFont.body(13, weight: 600)).foregroundStyle(LW.accent).contentShape(Rectangle()) }.buttonStyle(.plain)
                         }.padding(.top, 18)
                         Text("\(sessions.count) sessions · \(Fmt.hoursMinutes(sessions.reduce(0) { $0 + $1.durationMinutes }))").font(LWFont.mono(11)).foregroundStyle(LW.ink(0.45)).padding(.top, 2)
                         YearStrip(weeks: 53, cell: 5.2, radius: 1.7, rowGap: 2.6, fadeTo: 0.26)
