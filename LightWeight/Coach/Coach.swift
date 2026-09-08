@@ -54,7 +54,7 @@ struct ProgressionBrief: Codable {
     var sessionsAtLoad: Int      // sessions parked on the current load
     var vector: String           // ok · noStep · stepTooBig · outOfRange · stuck — can this lift even go up?
 }
-struct SessionBrief: Codable { var workout: String; var date: String; var vol: String; var verdict: String; var topSets: [String]; var rpe: Int? }
+struct SessionBrief: Codable { var workout: String; var date: String; var vol: String; var verdict: String; var topSets: [String]; var rpe: Int?; var srpe: Int?; var prs: Int? }
 struct CoachLandmarks: Codable { var bestCycleVol: String; var bestCycleNum: Int; var totalSessions: Int }
 struct WorkoutSessionsCtx: Codable { var name: String; var top: [String] }          // per-exercise top sets that cycle
 struct CycleDetail: Codable { var cycle: Int; var workouts: [WorkoutSessionsCtx] }
@@ -69,6 +69,11 @@ struct CoachContext: Codable {
     var subjectHistory: [SessionBrief]?    // last 5 sessions of the narrated workout
     var window: [SessionBrief]?            // session-coach: last min(30, all) sessions across every workout
     var thisRPE: String?                   // the user's feel tap for this session
+    /// Effort and recovery for this session, and how they read together. Effort rises with
+    /// fatigue AND with genuine intensity, so it cannot separate the two on its own.
+    var thisEffort: Int?                   // 0-10 Borg CR-10
+    var thisRecovery: Int?                 // 0-10 perceived recovery before the session
+    var loadState: String?                 // productive · underRecovered · stepTooBig · underStimulated
     var subjectVerdicts: [String: String]? // per-exercise verdicts of the narrated session
     var progression: [ProgressionBrief]?   // rep range, the user's own step size, and dip vs decline
     var mixDiffs: [String]?                // engine-computed workout-mix changes over the window, with volumes
@@ -292,7 +297,8 @@ extension AppStore {
     }
     func sessionBrief(_ s: Session) -> SessionBrief {
         SessionBrief(workout: s.title, date: Fmt.date(s.startedAt, "d MMM"), vol: Self.fmtVol(sessionVolume(s)),
-                     verdict: verdictString(s), topSets: topSetStrings(s), rpe: s.rpe)
+                     verdict: verdictString(s), topSets: topSetStrings(s), rpe: s.rpe,
+                     srpe: s.srpe, prs: s.prs)
     }
     /// Per-exercise progression facts for the subject session: rep range, the user's own step size, and
     /// whether a dip is one bad day or a real decline. Computed here so the model never guesses plate math.
@@ -534,6 +540,9 @@ extension AppStore {
         }
         ctx.recent = []
         ctx.thisRPE = s.rpe.map { ["easy", "about right", "brutal"][max(0, min(2, $0 - 1))] }
+        ctx.thisEffort = s.srpe
+        ctx.thisRecovery = s.prs
+        ctx.loadState = Self.loadState(srpe: s.srpe, prs: s.prs, verdict: verdictString(s))
         ctx.subjectVerdicts = analysis.results[s.id].map { r in r.exerciseVerdicts.mapValues { String(describing: $0) } }
         ctx.mixDiffs = mixDiffs(groupKey: s.groupKey)
         json = (try? JSONEncoder().encode(ctx)).flatMap { String(data: $0, encoding: .utf8) } ?? json
@@ -548,11 +557,28 @@ extension AppStore {
         coachNote(kind: "cycleInsight", key: key)
             .flatMap { try? JSONDecoder().decode(CoachRead.self, from: Data($0.text.utf8)) }
     }
-    /// The RPE tap: store the feel, then one-shot generate (cached forever per session).
-    func askCoach(session: Session, rpe: Int) {
-        session.rpe = rpe; try? context.save()
+    /// What the pair reads as together. Effort rises with fatigue AND with genuine intensity,
+    /// so it cannot separate a productive hard session from an under-recovered one on its own —
+    /// recovery breaks that tie, and the verdict says whether the work actually landed.
+    static func loadState(srpe: Int?, prs: Int?, verdict: String) -> String? {
+        guard let effort = srpe, let recovery = prs else { return nil }
+        let regressed = verdict.lowercased().contains("down") || verdict.lowercased().contains("stall")
+        let hard = effort >= 7
+        if hard && recovery <= 4 { return "underRecovered" }   // Laurent: 0-2 predicts a decrement
+        if hard && regressed { return "stepTooBig" }           // recovered, still went backwards
+        if hard { return "productive" }
+        if effort <= 4 && recovery >= 6 && !regressed { return "underStimulated" }
+        return "ok"
+    }
+
+    /// Store effort and recovery, then one-shot generate (cached forever per session).
+    /// Both nil means a retry of a call that failed silently.
+    func askCoach(session: Session, srpe: Int? = nil, prs: Int? = nil) {
+        if let srpe { session.srpe = srpe }
+        if let prs { session.prs = prs }
+        if srpe != nil || prs != nil { try? context.save() }
         let key = session.id.uuidString
-        coachLog("askCoach rpe=\(rpe) key=\(key.prefix(8)) noteExists=\(coachNote(kind: "sessionCoach", key: key) != nil) pending=\(coachPending.contains(key)) retries=\(UserDefaults.standard.integer(forKey: "coach.retry.\(key)")) live=\(coachClient is LiveCoachClient)")
+        coachLog("askCoach srpe=\(session.srpe.map(String.init) ?? "-") prs=\(session.prs.map(String.init) ?? "-") key=\(key.prefix(8)) noteExists=\(coachNote(kind: "sessionCoach", key: key) != nil) pending=\(coachPending.contains(key)) retries=\(UserDefaults.standard.integer(forKey: "coach.retry.\(key)")) live=\(coachClient is LiveCoachClient)")
         guard coachNote(kind: "sessionCoach", key: key) == nil, !coachPending.contains(key),
               UserDefaults.standard.integer(forKey: "coach.retry.\(key)") < 3 else { return }
         let ctx = sessionCoachContext(session); let live = coachClient is LiveCoachClient
@@ -756,6 +782,8 @@ struct CoachPanel: View {
     let session: Session
     @State private var expanded = false
     @State private var toast: String?
+    @State private var askEffort = true
+    @State private var draftEffort: Int?
     @State private var undo: (() -> Void)?
     @State private var applied: Set<String> = []
     @State private var sweep = false
@@ -772,7 +800,7 @@ struct CoachPanel: View {
             }
             else if store.coachPending.contains(session.id.uuidString) { sweepPanel { AnyView(waiting) } }
             else if store.coachFailed.contains(session.id.uuidString) { errorRow }
-            else if expanded && session.rpe == nil { panel { AnyView(rpeAsk) } }
+            else if expanded && session.srpe == nil { panel { AnyView(rpeAsk) } }
             else { collapsedRow }
         }
         .overlay(alignment: .bottom) {
@@ -792,7 +820,7 @@ struct CoachPanel: View {
 
     private var collapsedRow: some View {
         Button {
-            if let rpe = session.rpe { store.askCoach(session: session, rpe: rpe) }   // silent-failure path: tap retries
+            if session.srpe != nil { store.askCoach(session: session) }   // silent-failure path: tap retries
             else { withAnimation(.easeOut(duration: 0.2)) { expanded = true } }
         } label: {
             HStack(spacing: 9) {
@@ -806,21 +834,57 @@ struct CoachPanel: View {
         }.buttonStyle(.plain).accessibilityIdentifier("coach.ask")
     }
 
+    /// Two questions, asked one at a time. Effort first, then recovery — a single effort
+    /// scale cannot tell a heavy session from an under-recovered one, because both raise it.
     private var rpeAsk: some View {
         VStack(alignment: .leading, spacing: 12) {
-            header(sub: "one question first")
-            Text("How did that feel?").font(LWFont.body(15, weight: 800))
-            HStack(spacing: 8) {
-                ForEach(Array(["easy", "about right", "brutal"].enumerated()), id: \.offset) { i, label in
-                    Button { store.askCoach(session: session, rpe: i + 1) } label: {
-                        Text(label).font(LWFont.mono(11)).foregroundStyle(LW.ink(0.85))
-                            .padding(.horizontal, 14).frame(height: 34)
-                            .overlay(Capsule().strokeBorder(LW.ink(0.25), lineWidth: 1))
-                            .contentShape(Capsule())
-                    }.buttonStyle(.plain).accessibilityIdentifier("coach.rpe.\(i)")
+            header(sub: askEffort ? "two quick ones" : "one more")
+            if askEffort {
+                Text("How hard was that session overall?").font(LWFont.body(15, weight: 800))
+                scale(low: "very easy", high: "maximal", recent: recent(\.srpe)) { v in
+                    draftEffort = v
+                    withAnimation(.easeOut(duration: 0.18)) { askEffort = false }
+                }
+            } else {
+                Text("Before you started, how recovered did you feel?").font(LWFont.body(15, weight: 800))
+                scale(low: "not at all", high: "fully", recent: recent(\.prs)) { v in
+                    store.askCoach(session: session, srpe: draftEffort, prs: v)
                 }
             }
         }
+    }
+
+    /// Borg CR-10 is a category-ratio scale: a 4 is twice a 2, which is what makes
+    /// effort x duration a real load number. Collapsing it to 5 points breaks that.
+    private func scale(low: String, high: String, recent: [Int], onPick: @escaping (Int) -> Void) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 4) {
+                ForEach(0...10, id: \.self) { v in
+                    Button { UIImpactFeedbackGenerator(style: .light).impactOccurred(); onPick(v) } label: {
+                        Text("\(v)").font(LWFont.mono(11, semibold: recent.contains(v)))
+                            .foregroundStyle(LW.ink(0.85)).frame(maxWidth: .infinity).frame(height: 34)
+                            .background(RoundedRectangle(cornerRadius: 8).fill(LW.ink(recent.contains(v) ? 0.10 : 0.04)))
+                            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(LW.ink(0.18), lineWidth: 1))
+                            .contentShape(RoundedRectangle(cornerRadius: 8))
+                    }.buttonStyle(.plain).accessibilityIdentifier("coach.scale.\(v)")
+                }
+            }
+            HStack {
+                Text(low); Spacer()
+                // Answering next to your own recent numbers keeps this a comparison rather
+                // than an absolute — the documented failure of daily self-report is anchor drift.
+                if !recent.isEmpty { Text("you: " + recent.map(String.init).joined(separator: " · ")) }
+                Spacer(); Text(high)
+            }
+            .font(LWFont.mono(8.5)).foregroundStyle(LW.ink(0.4))
+        }
+    }
+
+    /// The last three answers on THIS workout, newest last.
+    private func recent(_ key: KeyPath<Session, Int?>) -> [Int] {
+        store.finishedSessions()
+            .filter { $0.groupKey == session.groupKey && $0.id != session.id }
+            .suffix(3).compactMap { $0[keyPath: key] }
     }
 
     private var waiting: some View {
@@ -843,7 +907,7 @@ struct CoachPanel: View {
     }
     private var errorRow: some View {
         Button {
-            if let rpe = session.rpe { store.askCoach(session: session, rpe: rpe) }
+            if session.srpe != nil { store.askCoach(session: session) }
             else { withAnimation(.easeOut(duration: 0.2)) { expanded = true } }
         } label: {
             HStack(spacing: 9) {

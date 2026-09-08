@@ -77,7 +77,13 @@ import SwiftData
     @Attribute(.unique) var hevyKey: String?    // "\(title)|\(start_time)" — idempotent import
     var isDraft: Bool
     var isStarted: Bool = false      // a draft that has actually begun (timer running) — the "live" session
-    var rpe: Int? = nil              // coach ask: 1 easy · 2 about right · 3 brutal
+    var rpe: Int? = nil              // legacy 1-3 ask, kept so old sessions still read
+    // Borg CR-10 session effort (Foster's session-RPE). A category-ratio scale, so
+    // srpe x duration is a meaningful internal load; the old 1-3 supported no arithmetic.
+    var srpe: Int? = nil             // 0-10
+    // Perceived Recovery Status (Laurent 2011). Effort alone cannot separate a heavy
+    // session from an under-recovered one — both raise srpe. This is what breaks the tie.
+    var prs: Int? = nil              // 0-10
     var edited: Bool = false         // numbers corrected after finishing (Session Updates §4)
     @Relationship(deleteRule: .cascade, inverse: \SessionExercise.session) var exercises: [SessionExercise]
 
