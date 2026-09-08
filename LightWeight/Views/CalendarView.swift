@@ -5,82 +5,28 @@ import UniformTypeIdentifiers
 /// S8 — month view of what actually happened, Hevy import, pinned workout progression.
 struct CalendarView: View {
     @Environment(AppStore.self) private var store
-    @Environment(Router.self) private var router
     @State private var month: Date = .now
     @State private var importing = false
-    @State private var yearly = false
-    @State private var pinMonths: Int? = 12   // pinned charts: 6M / YEAR (default) / ALL (nil)
 
+    /// Split into children on purpose. When the month grid, the year strip, the pinned
+    /// charts and 470 history rows all live in one body, any state touch re-evaluates the
+    /// lot — tapping 6M/YEAR/ALL rebuilt the whole page. Each part now owns its own state,
+    /// so a change reaches only what it affects. The pager renders this page twice, which
+    /// doubles whatever is left.
     var body: some View {
-        let cal = Calendar(identifier: .iso8601)
-        let start = cal.dateInterval(of: .month, for: month)!.start
-        let days = cal.range(of: .day, in: .month, for: start)!.count
-        let lead = (cal.component(.weekday, from: start) + 5) % 7      // Monday-first
-        let sessions = store.finishedSessions().filter { cal.isDate($0.startedAt, equalTo: start, toGranularity: .month) }
-        let trained = Set(sessions.map { cal.component(.day, from: $0.startedAt) })
-        let todayDay = cal.isDate(store.today, equalTo: start, toGranularity: .month) ? cal.component(.day, from: store.today) : -1
         let _ = store.dataTick
-        let pinned = store.pinnedWorkouts()
         Screen(top: 102, underBar: true) {
             VStack(alignment: .leading, spacing: 0) {
                 HeaderScroll(page: .calendar) {
                     VStack(alignment: .leading, spacing: 0) {
-                        HStack(alignment: .firstTextBaseline) {
-                            Text(Fmt.date(start, "MMMM yyyy").uppercased()).font(LWFont.display(28, width: 88)).tracking(-0.6)
-                            Spacer()
-                        }.padding(.top, 18)
-                        Text("\(sessions.count) sessions · \(Fmt.hoursMinutes(sessions.reduce(0) { $0 + $1.durationMinutes }))").font(LWFont.mono(11)).foregroundStyle(LW.ink(0.45)).padding(.top, 2)
+                        MonthHeading(month: month)
                         YearStrip(weeks: 53, cell: 5.2, radius: 1.7, rowGap: 2.6, fadeTo: 0.26)
                             .environment(store)
                             .padding(.top, 16)
                             .accessibilityIdentifier("year.strip")
-                        let cols = Array(repeating: GridItem(.flexible(), spacing: 0), count: 7)
-                        LazyVGrid(columns: cols, spacing: 0) { ForEach(Array("MTWTFSS".enumerated()), id: \.offset) { _, c in Text(String(c)).font(LWFont.mono(9.5)).foregroundStyle(LW.ink(0.3)) } }.padding(.top, 16)
-                        LazyVGrid(columns: cols, spacing: 3) {
-                            ForEach(-max(lead, 0)..<0, id: \.self) { _ in Color.clear.frame(height: 21) }
-                            ForEach(1...days, id: \.self) { d in
-                                HStack(spacing: 3) {
-                                    Text("\(d)").font(LWFont.mono(11)).foregroundStyle(d == todayDay ? LW.accent : trained.contains(d) ? LW.ink(0.9) : LW.ink(0.45))
-                                    Circle().fill(trained.contains(d) ? LW.accent : .clear).frame(width: 4, height: 4)
-                                }.frame(height: 21).frame(maxWidth: .infinity)
-                                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(d == todayDay ? LW.accent : .clear, lineWidth: 1))
-                            }
-                        }.padding(.top, 4)
-                        if let r = store.importReport {
-                            Text("Import review · \(r.imported) imported · \(r.skipped) already there · \(r.customCreated.count) custom")
-                                .font(LWFont.mono(10.5)).foregroundStyle(LW.ink(0.45)).padding(EdgeInsets(top: 10, leading: 12, bottom: 10, trailing: 12))
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(LW.ink(0.25), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))).padding(.top, 12)
-                        }
-                        if !pinned.isEmpty {
-                            HStack {
-                                Text("Progression").lwLabel(10, tracking: 0.14)
-                                Spacer()
-                                HStack(spacing: 0) {
-                                    ForEach([("6M", 6), ("YEAR", 12), ("ALL", nil)], id: \.0) { label, m in
-                                        Button { pinMonths = m } label: {
-                                            Text(label).font(LWFont.mono(9)).tracking(0.6)
-                                                .foregroundStyle(pinMonths == m ? LW.inkOnAccent : LW.ink(0.5))
-                                                .padding(.horizontal, 9).frame(height: 22)
-                                                .background(Capsule().fill(pinMonths == m ? LW.accent : .clear))
-                                                .contentShape(Capsule())
-                                        }.buttonStyle(.plain)
-                                    }
-                                }.background(Capsule().fill(LW.ink(0.08)))
-                            }.padding(.top, 22)
-                            let pairs: [[Workout]] = stride(from: 0, to: pinned.count, by: 2).map { Array(pinned[$0..<min($0 + 2, pinned.count)]) }
-                            ForEach(Array(pairs.enumerated()), id: \.offset) { _, rowWs in
-                                HStack(alignment: .top, spacing: 10) {
-                                    ForEach(rowWs, id: \.id) { w in
-                                        let s = series(for: w, months: pinMonths)
-                                        ChartCard(chartHeight: 72, valueFormat: { String(format: "%.2f", $0) }, title: w.name, subtitle: "index", delta: s.delta, values: s.values, left: s.left, right: s.right, caption: s.caption)
-                                    }
-                                }.padding(.top, 10)
-                            }
-                        } else if !store.finishedSessions().isEmpty {
-                            Text("pin workouts on the Workouts page to chart them here")
-                                .font(LWFont.mono(10)).foregroundStyle(LW.ink(0.3)).padding(.top, 22)
-                        }
+                        MonthGrid(month: month).padding(.top, 16)
+                        ImportReceipt()
+                        PinnedProgression()
                         AllHistory().padding(.top, 22)
                         if store.finishedSessions().isEmpty { EmptyCalendarCard { importing = true } }
                         Color.clear.frame(height: 90)
@@ -94,6 +40,116 @@ struct CalendarView: View {
             if let text = try? String(contentsOf: url, encoding: .utf8) { store.importHevy(text: text) }
         }
         .onAppear { month = store.finishedSessions().last?.startedAt ?? store.today }
+    }
+}
+
+/// Month name and the month's totals.
+private struct MonthHeading: View {
+    @Environment(AppStore.self) private var store
+    let month: Date
+    var body: some View {
+        let cal = Calendar(identifier: .iso8601)
+        let start = cal.dateInterval(of: .month, for: month)!.start
+        let sessions = store.finishedSessions().filter { cal.isDate($0.startedAt, equalTo: start, toGranularity: .month) }
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(Fmt.date(start, "MMMM yyyy").uppercased()).font(LWFont.display(28, width: 88)).tracking(-0.6)
+                Spacer()
+            }.padding(.top, 18)
+            Text("\(sessions.count) sessions · \(Fmt.hoursMinutes(sessions.reduce(0) { $0 + $1.durationMinutes }))")
+                .font(LWFont.mono(11)).foregroundStyle(LW.ink(0.45)).padding(.top, 2)
+        }
+    }
+}
+
+/// Weekday letters plus the day cells for one month.
+private struct MonthGrid: View {
+    @Environment(AppStore.self) private var store
+    let month: Date
+    var body: some View {
+        let cal = Calendar(identifier: .iso8601)
+        let start = cal.dateInterval(of: .month, for: month)!.start
+        let days = cal.range(of: .day, in: .month, for: start)!.count
+        let lead = (cal.component(.weekday, from: start) + 5) % 7      // Monday-first
+        let trained = Set(store.finishedSessions()
+            .filter { cal.isDate($0.startedAt, equalTo: start, toGranularity: .month) }
+            .map { cal.component(.day, from: $0.startedAt) })
+        let todayDay = cal.isDate(store.today, equalTo: start, toGranularity: .month) ? cal.component(.day, from: store.today) : -1
+        let cols = Array(repeating: GridItem(.flexible(), spacing: 0), count: 7)
+        VStack(alignment: .leading, spacing: 0) {
+            LazyVGrid(columns: cols, spacing: 0) {
+                ForEach(Array("MTWTFSS".enumerated()), id: \.offset) { _, c in
+                    Text(String(c)).font(LWFont.mono(9.5)).foregroundStyle(LW.ink(0.3))
+                }
+            }
+            LazyVGrid(columns: cols, spacing: 3) {
+                ForEach(-max(lead, 0)..<0, id: \.self) { _ in Color.clear.frame(height: 21) }
+                ForEach(1...days, id: \.self) { d in
+                    HStack(spacing: 3) {
+                        Text("\(d)").font(LWFont.mono(11))
+                            .foregroundStyle(d == todayDay ? LW.accent : trained.contains(d) ? LW.ink(0.9) : LW.ink(0.45))
+                        Circle().fill(trained.contains(d) ? LW.accent : .clear).frame(width: 4, height: 4)
+                    }
+                    .frame(height: 21).frame(maxWidth: .infinity)
+                    .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(d == todayDay ? LW.accent : .clear, lineWidth: 1))
+                }
+            }.padding(.top, 4)
+        }
+    }
+}
+
+/// The receipt shown after an import, absent otherwise.
+private struct ImportReceipt: View {
+    @Environment(AppStore.self) private var store
+    var body: some View {
+        if let r = store.importReport {
+            Text("Import review · \(r.imported) imported · \(r.skipped) already there · \(r.customCreated.count) custom")
+                .font(LWFont.mono(10.5)).foregroundStyle(LW.ink(0.45))
+                .padding(EdgeInsets(top: 10, leading: 12, bottom: 10, trailing: 12))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(LW.ink(0.25), style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
+                .padding(.top, 12)
+        }
+    }
+}
+
+/// Pinned workout charts. Owns its own range so changing it cannot invalidate the rest
+/// of the page — that alone was rebuilding the grid, the strip and every history row.
+private struct PinnedProgression: View {
+    @Environment(AppStore.self) private var store
+    @State private var pinMonths: Int? = 12   // 6M / YEAR (default) / ALL (nil)
+    var body: some View {
+        let pinned = store.pinnedWorkouts()
+        if !pinned.isEmpty {
+            HStack {
+                Text("Progression").lwLabel(10, tracking: 0.14)
+                Spacer()
+                HStack(spacing: 0) {
+                    ForEach([("6M", 6), ("YEAR", 12), ("ALL", nil)], id: \.0) { label, m in
+                        Button { pinMonths = m } label: {
+                            Text(label).font(LWFont.mono(9)).tracking(0.6)
+                                .foregroundStyle(pinMonths == m ? LW.inkOnAccent : LW.ink(0.5))
+                                .padding(.horizontal, 9).frame(height: 22)
+                                .background(Capsule().fill(pinMonths == m ? LW.accent : .clear))
+                                .contentShape(Capsule())
+                        }.buttonStyle(.plain)
+                    }
+                }.background(Capsule().fill(LW.ink(0.08)))
+            }.padding(.top, 22)
+            let pairs: [[Workout]] = stride(from: 0, to: pinned.count, by: 2).map { Array(pinned[$0..<min($0 + 2, pinned.count)]) }
+            ForEach(Array(pairs.enumerated()), id: \.offset) { _, rowWs in
+                HStack(alignment: .top, spacing: 10) {
+                    ForEach(rowWs, id: \.id) { w in
+                        let s = series(for: w, months: pinMonths)
+                        ChartCard(chartHeight: 72, valueFormat: { String(format: "%.2f", $0) }, title: w.name,
+                                  subtitle: "index", delta: s.delta, values: s.values, left: s.left, right: s.right, caption: s.caption)
+                    }
+                }.padding(.top, 10)
+            }
+        } else if !store.finishedSessions().isEmpty {
+            Text("pin workouts on the Workouts page to chart them here")
+                .font(LWFont.mono(10)).foregroundStyle(LW.ink(0.3)).padding(.top, 22)
+        }
     }
 
     private func series(for w: Workout, months: Int?) -> SummaryView.Series {
@@ -137,8 +193,15 @@ struct AllHistory: View {
                             if s.edited { Text("EDITED").font(LWFont.mono(8.5)).tracking(0.8).foregroundStyle(LW.ink(0.4)) }
                             Spacer()
                             Text(Fmt.date(s.startedAt, "EEE d MMM")); Text("\(s.durationMinutes) min")
+                            // Accent is earned here too: this row draws its own arrow rather
+                            // than going through VerdictIcon, so it kept accenting every up.
                             let st = store.result(s)?.state
-                            if st == .up || st == .best { Icon(kind: .arrowUp, size: 12, color: LW.accent, weight: 2) } else { Color.clear.frame(width: 12, height: 12) }
+                            if st == .best {
+                                Icon(kind: .arrowUp, size: 12, color: LW.accentBright, weight: 2)
+                                    .shadow(color: LW.accentBright.opacity(0.7), radius: 4)
+                            } else if st == .up {
+                                Icon(kind: .arrowUp, size: 12, color: LW.ink(0.7), weight: 2)
+                            } else { Color.clear.frame(width: 12, height: 12) }
                         }.font(LWFont.mono(11)).foregroundStyle(LW.ink(0.45)).frame(height: 42).overlay(alignment: .top) { Hairline() }.contentShape(Rectangle())
                     }
                 }
