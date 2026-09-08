@@ -12,6 +12,15 @@ import Observation
     var context: ModelContext { container.mainContext }
     private(set) var analysis = Analysis()
     private(set) var exercisesByID: [String: Exercise] = [:]
+    /// workout(_:) was a full SwiftData fetch WITH A SORT on every call, and it is called
+    /// per pinned chart, per routine slot, per segment label, per nextWorkout() — dozens of
+    /// store round trips per body evaluation. Rebuilt lazily on dataTick rather than in
+    /// reload(), so mutations that only save and bump the tick stay correct.
+    /// ObservationIgnored: filling it during a body read must not invalidate that read.
+    @ObservationIgnored private var workoutsCache: [Workout] = []
+    @ObservationIgnored private var workoutsByID: [UUID: Workout] = [:]
+    @ObservationIgnored private var workoutsTick = -1
+
     private var sessionsCache: [Session] = []            // finished, chronological
     private var sessionsByID: [UUID: Session] = [:]
     private var exercisesCache: [Exercise] = []
@@ -248,8 +257,14 @@ import Observation
     func pinnedWorkouts() -> [Workout] {
         pinnedWorkoutIDs.compactMap { id in UUID(uuidString: id).flatMap { workout($0) } }
     }
-    func workouts() -> [Workout] { (try? context.fetch(FetchDescriptor<Workout>(sortBy: [SortDescriptor(\.name)]))) ?? [] }
-    func workout(_ id: UUID?) -> Workout? { id.flatMap { id in workouts().first { $0.id == id } } }
+    private func ensureWorkouts() {
+        guard workoutsTick != dataTick else { return }
+        workoutsCache = (try? context.fetch(FetchDescriptor<Workout>(sortBy: [SortDescriptor(\.name)]))) ?? []
+        workoutsByID = Dictionary(workoutsCache.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        workoutsTick = dataTick
+    }
+    func workouts() -> [Workout] { ensureWorkouts(); return workoutsCache }
+    func workout(_ id: UUID?) -> Workout? { ensureWorkouts(); return id.flatMap { workoutsByID[$0] } }
     func activeRoutine() -> Routine? { ((try? context.fetch(FetchDescriptor<Routine>())) ?? []).first { $0.isActive } }
     func sessionCount(workoutID: UUID) -> Int { sessionCounts[workoutID] ?? 0 }
     func exercise(_ id: String) -> Exercise? { exercisesByID[id] }
