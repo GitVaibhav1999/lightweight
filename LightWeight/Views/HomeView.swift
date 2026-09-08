@@ -283,10 +283,15 @@ struct WorkoutCard: View {
         return "\(ex) · \(Fmt.ago(d, today: store.today))"
     }
     /// One arrow for the whole workout: up if anything moved, down only if nothing did.
+    /// A workout's best is the workout's own record — its index beating the best that group
+    /// has ever posted — not "one lift PR'd". Those are different claims, and reading the
+    /// second as the first lit almost every session, which is how the accent lost its meaning.
+    /// A single PR inside an otherwise ordinary session is an up here; the lift keeps its own
+    /// best on the summary and exercise pages, where the claim is about that lift.
     private func overall(_ r: SessionResult, _ last: Session) -> ExerciseVerdict {
+        if r.state == .best { return .best }
         let vs = last.orderedExercises.compactMap { r.exerciseVerdicts[$0.exerciseID] }
-        if vs.contains(.best) { return .best }
-        if vs.contains(.up) { return .up }
+        if vs.contains(.up) || vs.contains(.best) { return .up }
         return vs.contains(.down) && !vs.contains(.held) ? .down : .held
     }
     private func summary(_ r: SessionResult, _ s: AppStore.WorkoutStats, count: Int) -> String {
