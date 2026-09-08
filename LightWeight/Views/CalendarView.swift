@@ -188,6 +188,8 @@ struct AllHistory: View {
     /// its own state, and 470 of those is enough to stall the scroll on device. Render a page
     /// at a time and grow when the reader reaches the end.
     @State private var shown = pageSize
+    @State private var scrollY: CGFloat = 0
+    @State private var grewAt: CGFloat = -10_000      // first growth is always allowed
     private static let pageSize = 50
 
     var body: some View {
@@ -227,8 +229,19 @@ struct AllHistory: View {
                     // scroll view, so growing pushes the skeleton back out of view and it
                     // settles — which is what makes auto-load work without running away.
                     HistorySkeleton(rows: min(3, sessions.count - shown))
+                        .id("history-skeleton")
+                        .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y } action: { _, y in
+                            scrollY = y
+                        }
                         .onScrollVisibilityChange(threshold: 0.15) { visible in
-                            guard visible else { return }
+                            // Visibility alone is not enough: on a short page the skeleton is
+                            // already in view, so each growth re-triggered it and the window ran
+                            // to the end. That is why the lag appeared only with no pinned chart
+                            // — a chart made the page tall enough to push the skeleton below the
+                            // fold. Requiring the reader to have scrolled since the last growth
+                            // is what actually stops it.
+                            guard visible, abs(scrollY - grewAt) > 240 else { return }
+                            grewAt = scrollY
                             shown = min(shown + Self.pageSize, sessions.count)
                         }
                         .accessibilityIdentifier("history.more")
